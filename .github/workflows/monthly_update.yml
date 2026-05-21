@@ -115,21 +115,58 @@ jobs:
                                   return player_id, values[-1].get('mw', '')
                   except: pass
                   return player_id, None
+          # Stap 1: haal marktwaarden rechtstreeks uit players.json (scraper pagina data)
+          results = {}
+          if PLAYERS_FILE.exists():
+              with open(PLAYERS_FILE, encoding='utf-8') as f:
+                  for line in f:
+                      line = line.strip()
+                      if not line: continue
+                      try:
+                          p = json.loads(line)
+                          href = p.get('href', '')
+                          parts = href.rstrip('/').split('/')
+                          if 'spieler' not in parts: continue
+                          pid = parts[parts.index('spieler') + 1]
+                          for field in ['current_market_value', 'market_value', 'marketValue']:
+                              mv = p.get(field)
+                              if mv and str(mv).strip() not in ('', 'None', '0', '-', 'null'):
+                                  results[pid] = str(mv).strip()
+                                  break
+                      except: pass
+          print(f"Marktwaarden uit scraper pagina: {len(results)} spelers")
+
+          # Stap 2: ceapi voor spelers zonder waarde
           async def main():
-              player_ids = get_player_ids()
-              print(f"Marktwaarden ophalen voor {len(player_ids)} spelers...")
+              all_ids = []
+              if PLAYERS_FILE.exists():
+                  with open(PLAYERS_FILE, encoding='utf-8') as f:
+                      seen = set(results.keys())
+                      for line in f:
+                          line = line.strip()
+                          if not line: continue
+                          try:
+                              p = json.loads(line)
+                              href = p.get('href', '')
+                              parts = href.rstrip('/').split('/')
+                              if 'spieler' in parts:
+                                  pid = parts[parts.index('spieler') + 1]
+                                  if pid not in seen:
+                                      all_ids.append(pid)
+                                      seen.add(pid)
+                          except: pass
+              print(f"Marktwaarden via ceapi voor {len(all_ids)} spelers zonder waarde...")
               semaphore = asyncio.Semaphore(3)
-              results = {}
               async with aiohttp.ClientSession() as session:
-                  tasks = [fetch_mv(session, pid, semaphore) for pid in player_ids]
+                  tasks = [fetch_mv(session, pid, semaphore) for pid in all_ids]
                   done = 0
                   for coro in asyncio.as_completed(tasks):
                       pid, mv = await coro
                       if mv: results[pid] = mv
                       done += 1
                       if done % 500 == 0:
-                          print(f"  {done}/{len(player_ids)} verwerkt, {len(results)} met waarde")
-              print(f"Klaar: {len(results)} marktwaarden gevonden")
+                          print(f"  {done}/{len(all_ids)} verwerkt, {len(results)} totaal met waarde")
+              print(f"Klaar: {len(results)} marktwaarden totaal")
               with open(MV_FILE, 'w', encoding='utf-8') as f:
                   json.dump(results, f)
           asyncio.run(main())
@@ -333,18 +370,24 @@ jobs:
               return parts[-1]
           def parse_market_value(mv_str):
               if not mv_str: return ''
-              mv_str = str(mv_str).strip()
+              s = str(mv_str).strip()
+              # Al een getal?
               try:
-                  multiplier = 1
-                  if 'm' in mv_str.lower():
-                      multiplier = 1_000_000
-                      mv_str = mv_str.lower().replace('m','').replace('e','').replace('£','').strip()
-                  elif 'k' in mv_str.lower() or 'th.' in mv_str.lower():
-                      multiplier = 1_000
-                      mv_str = mv_str.lower().replace('k','').replace('th.','').replace('e','').replace('£','').strip()
-                  else:
-                      mv_str = mv_str.replace('e','').replace('£','').replace(',','').strip()
-                  return int(float(mv_str) * multiplier)
+                  v = int(float(s))
+                  if v > 0: return v
+              except: pass
+              # Verwijder valutasymbolen
+              s = s.replace('€','').replace('£','').replace('$','').strip()
+              s_low = s.lower()
+              try:
+                  if 'mio' in s_low or s_low.endswith('m') or ' m' in s_low:
+                      s2 = s_low.replace('mio.','').replace('mio','').replace(' m','').replace('m','').replace(',','.').strip()
+                      return int(float(s2) * 1_000_000)
+                  if 'th.' in s_low or s_low.endswith('k') or ' k' in s_low or 'tsd' in s_low:
+                      s2 = s_low.replace('th.','').replace('tsd.','').replace('tsd','').replace(' k','').replace('k','').replace(',','.').strip()
+                      return int(float(s2) * 1_000)
+                  s2 = s.replace(',','.').strip()
+                  return int(float(s2))
               except: return ''
           # Laad marktwaarden
           mv_lookup = {}
@@ -410,9 +453,9 @@ jobs:
               position = next((v for k, v in pos_map.items() if k in pos.lower()), 'Midfield')
               mv = mv_lookup.get(str(player_id), '')
               if not mv:
-                  mv_raw = p.get('current_market_value') or ''
-                  try: mv = int(str(mv_raw).replace('e','').replace(',','').strip()) if mv_raw else ''
-                  except: mv = ''
+                  mv_raw = p.get('current_market_value') or p.get('market_value') or ''
+                  if mv_raw:
+                      mv = parse_market_value(str(mv_raw))
               mv_high_raw = p.get('highest_market_value') or ''
               try: mv_high = int(str(mv_high_raw).replace('e','').replace(',','').strip()) if mv_high_raw else ''
               except: mv_high = ''
@@ -442,9 +485,14 @@ jobs:
               if pid:
                   if pid in player_id_map:
                       old_row = player_id_map[pid]
+                      # Bewaar debut kolommen van bestaande rij
                       for col in debut_cols:
                           if col in old_row and old_row[col]:
                               r[col] = old_row[col]
+                      # Bewaar marktwaarde als nieuwe rij geen waarde heeft
+                      for mv_col in ['market_value_in_eur', 'highest_market_value_in_eur']:
+                          if not r.get(mv_col) and old_row.get(mv_col):
+                              r[mv_col] = old_row[mv_col]
                   player_id_map[pid] = r
           merged_players = list(player_id_map.values())
           if merged_players:
@@ -511,12 +559,6 @@ jobs:
           # ── WEDSTRIJDEN ──
           games = load_jsonl(RAW / 'games.json')
           print(f"Games geladen: {len(games)}")
-          if games:
-              g0 = games[0]
-              print(f"Eerste game keys: {list(g0.keys())}")
-              print(f"game_id={repr(g0.get('game_id',''))}, href={repr(g0.get('href',''))}, home_club_id={repr(g0.get('home_club_id',''))}")
-              game_id_test = g0.get('game_id','') or extract_id(g0.get('href',''))
-              print(f"game_id na fix: {repr(game_id_test)}")
           new_game_rows = []
           for g in games:
               if g.get('home_club_id') or g.get('home_club_goals') is not None:
