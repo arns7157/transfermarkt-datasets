@@ -338,18 +338,129 @@ jobs:
           PYEOF
           echo "Valuations: $(wc -l < $GITHUB_WORKSPACE/data/raw/valuations.json 2>/dev/null || echo 0)"
 
-      - name: Stap 3 - Optredens scrapen
+      - name: Stap 3 - Optredens ophalen via API
         timeout-minutes: 120
         continue-on-error: true
         run: |
-          cd /tmp/scraper
-          for SEASON in $SEASONS; do
-            echo "=== Optredens seizoen $SEASON ==="
-            scrapy crawl appearances \
-              -a parents=$GITHUB_WORKSPACE/data/raw/players.json \
-              -a season=$SEASON \
-              >> $GITHUB_WORKSPACE/data/raw/appearances.json || true
-          done
+          python3 << 'PYEOF'
+          import json, asyncio, aiohttp, os
+          from pathlib import Path
+          from datetime import datetime
+
+          RAW = Path('data/raw')
+          PLAYERS_FILE = RAW / 'players.json'
+          APPEARANCES_FILE = RAW / 'appearances.json'
+          PERFORMANCE_API = "https://www.transfermarkt.co.uk/ceapi/performance-game/"
+          HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept": "application/json"}
+
+          TARGET_SEASONS = {int(s) for s in os.environ.get('SEASONS', '').split()}
+
+          def extract_player_id(href):
+              parts = href.rstrip('/').split('/')
+              if 'spieler' in parts:
+                  return parts[parts.index('spieler') + 1]
+              return None
+
+          def load_players():
+              players = []
+              if not PLAYERS_FILE.exists():
+                  return players
+              with open(PLAYERS_FILE, encoding='utf-8') as f:
+                  for line in f:
+                      line = line.strip()
+                      if not line:
+                          continue
+                      try:
+                          p = json.loads(line)
+                      except Exception:
+                          continue
+                      href = p.get('href', '')
+                      pid = extract_player_id(href)
+                      if pid:
+                          players.append({
+                              'id': pid, 'href': href,
+                              'name': p.get('name', ''), 'last_name': p.get('last_name', ''),
+                          })
+              return players
+
+          async def fetch_performance(session, player, semaphore):
+              async with semaphore:
+                  url = f"{PERFORMANCE_API}{player['id']}"
+                  try:
+                      async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                          if resp.status == 200:
+                              data = await resp.json(content_type=None)
+                              return player, (data.get('data') or {}).get('performance', [])
+                  except Exception:
+                      pass
+                  return player, []
+
+          def build_appearance(player, entry):
+              game_info = entry.get('gameInformation') or {}
+              season_id = game_info.get('seasonId')
+              if season_id not in TARGET_SEASONS:
+                  return None
+
+              stats = entry.get('statistics') or {}
+              general = stats.get('generalStatistics') or {}
+              goal_stats = stats.get('goalStatistics') or {}
+              card_stats = stats.get('cardStatistics') or {}
+              time_stats = stats.get('playingTimeStatistics') or {}
+              club_info = (entry.get('clubsInformation') or {}).get('club') or {}
+
+              date_str = ''
+              raw_date = (game_info.get('date') or {}).get('dateTimeUTC')
+              if raw_date:
+                  try:
+                      dt = datetime.fromisoformat(raw_date.replace('Z', '+00:00'))
+                      date_str = dt.strftime('%d/%m/%y')
+                  except Exception:
+                      date_str = ''
+
+              game_id = game_info.get('gameId', '')
+              club_id = club_info.get('clubId', '')
+
+              return {
+                  'parent': {
+                      'href': player['href'],
+                      'name': player['name'],
+                      'last_name': player['last_name'],
+                      'current_club': {'href': f"/club/verein/{club_id}"} if club_id else {},
+                  },
+                  'date': date_str,
+                  'competition_code': game_info.get('competitionId', ''),
+                  'yellow_cards': card_stats.get('yellowCard', 0) or 0,
+                  'red_cards': card_stats.get('redCard', 0) or 0,
+                  'goals': goal_stats.get('goalsScoredTotal', 0) or 0,
+                  'assists': goal_stats.get('assists', 0) or 0,
+                  'minutes_played': time_stats.get('playedMinutes', 0) or 0,
+                  'position_in_game': '',
+                  'result': {'href': f"/spielbericht/{game_id}"} if game_id else {},
+              }
+
+          async def main():
+              players = load_players()
+              print(f"Optredens ophalen voor {len(players)} spelers (seizoenen: {sorted(TARGET_SEASONS)})...")
+              semaphore = asyncio.Semaphore(10)
+              written = 0
+              async with aiohttp.ClientSession() as session:
+                  tasks = [fetch_performance(session, p, semaphore) for p in players]
+                  done = 0
+                  with open(APPEARANCES_FILE, 'a', encoding='utf-8') as out:
+                      for coro in asyncio.as_completed(tasks):
+                          player, entries = await coro
+                          for entry in entries:
+                              record = build_appearance(player, entry)
+                              if record:
+                                  out.write(json.dumps(record) + '\n')
+                                  written += 1
+                          done += 1
+                          if done % 500 == 0:
+                              print(f"  {done}/{len(players)} verwerkt, {written} optredens geschreven")
+              print(f"Klaar: {written} optredens voor seizoenen {sorted(TARGET_SEASONS)}")
+
+          asyncio.run(main())
+          PYEOF
           echo "Optredens nieuw: $(wc -l < $GITHUB_WORKSPACE/data/raw/appearances.json)"
 
       - name: Stap 4 - Wedstrijden scrapen
@@ -720,7 +831,17 @@ jobs:
           git add data/csv/
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M)
           git commit -m "ScoutAI data update ${TIMESTAMP}" || echo "Geen wijzigingen"
-          git push
+
+          for i in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push mislukt (poging $i), remote is intussen gewijzigd. Rebasen en opnieuw proberen..."
+            git fetch origin master
+            git rebase origin/master || { echo "Rebase mislukt, stop."; git rebase --abort; exit 1; }
+          done
+          echo "Push bleef mislukken na meerdere pogingen."
+          exit 1
 
       - name: Samenvatting
         run: |
