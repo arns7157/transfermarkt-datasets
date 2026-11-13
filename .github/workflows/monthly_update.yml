@@ -59,6 +59,7 @@ jobs:
       - name: Install transfermarkt-scraper
         run: |
           pip install poetry
+          rm -rf /tmp/scraper
           git clone --branch v0.4.0 https://github.com/dcaribou/transfermarkt-scraper.git /tmp/scraper
           cd /tmp/scraper
           rm -f poetry.lock
