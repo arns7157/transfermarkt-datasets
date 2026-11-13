@@ -29,9 +29,26 @@ jobs:
             CURRENT_SEASON=$((YEAR - 1))
           fi
           PREV_SEASON=$((CURRENT_SEASON - 1))
+
+          STATE_FILE="data/csv/.scrape_state.json"
+          LAST_FINALIZED=""
+          if [ -f "$STATE_FILE" ]; then
+            LAST_FINALIZED=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('last_finalized_season') or '')")
+          fi
+
+          # Vorig seizoen is afgerond en al eens volledig opgehaald na die afronding:
+          # niet opnieuw scrapen. Huidig seizoen loopt nog, dus altijd opnieuw.
+          if [ "$LAST_FINALIZED" = "$PREV_SEASON" ]; then
+            SEASONS="$CURRENT_SEASON"
+          else
+            SEASONS="$PREV_SEASON $CURRENT_SEASON"
+          fi
+
           echo "CURRENT_SEASON=$CURRENT_SEASON" >> $GITHUB_ENV
           echo "PREV_SEASON=$PREV_SEASON" >> $GITHUB_ENV
-          echo "Seizoenen: $PREV_SEASON (vorig) en $CURRENT_SEASON (huidig)"
+          echo "SEASONS=$SEASONS" >> $GITHUB_ENV
+          echo "Laatst afgerond seizoen (state): ${LAST_FINALIZED:-geen}"
+          echo "Te scrapen seizoenen deze run: $SEASONS"
 
       - name: Install transfermarkt-scraper
         run: |
@@ -68,7 +85,7 @@ jobs:
       - name: Stap 1 - Clubs scrapen
         run: |
           cd /tmp/scraper
-          for SEASON in $PREV_SEASON $CURRENT_SEASON; do
+          for SEASON in $SEASONS; do
             echo "=== Clubs seizoen $SEASON ==="
             scrapy crawl clubs \
               -a parents=$GITHUB_WORKSPACE/data/competitions.json \
@@ -80,7 +97,7 @@ jobs:
       - name: Stap 2 - Spelers scrapen
         run: |
           cd /tmp/scraper
-          for SEASON in $PREV_SEASON $CURRENT_SEASON; do
+          for SEASON in $SEASONS; do
             echo "=== Spelers seizoen $SEASON ==="
             scrapy crawl players \
               -a parents=$GITHUB_WORKSPACE/data/raw/clubs.json \
@@ -326,7 +343,7 @@ jobs:
         continue-on-error: true
         run: |
           cd /tmp/scraper
-          for SEASON in $PREV_SEASON $CURRENT_SEASON; do
+          for SEASON in $SEASONS; do
             echo "=== Optredens seizoen $SEASON ==="
             scrapy crawl appearances \
               -a parents=$GITHUB_WORKSPACE/data/raw/players.json \
@@ -340,7 +357,7 @@ jobs:
         continue-on-error: true
         run: |
           cd /tmp/scraper
-          for SEASON in $PREV_SEASON $CURRENT_SEASON; do
+          for SEASON in $SEASONS; do
             echo "=== Wedstrijden seizoen $SEASON ==="
             scrapy crawl games \
               -a parents=$GITHUB_WORKSPACE/data/competitions.json \
@@ -699,6 +716,7 @@ jobs:
           git config user.name "ScoutAI Bot"
           git config user.email "actions@users.noreply.github.com"
           for f in data/csv/*.csv; do [ -f "$f" ] && gzip -f "$f" || true; done
+          python3 -c "import json; json.dump({'last_finalized_season': $PREV_SEASON}, open('data/csv/.scrape_state.json', 'w'))"
           git add data/csv/
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M)
           git commit -m "ScoutAI data update ${TIMESTAMP}" || echo "Geen wijzigingen"
