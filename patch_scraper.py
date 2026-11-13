@@ -158,6 +158,40 @@ def patch_appearances():
     return True
 
 
+def patch_common():
+    """Koppel de oude start_requests() override aan Scrapy's nieuwere async
+    start() entrypoint. Recente Scrapy-versies (2.13+) roepen start() aan
+    i.p.v. start_requests() rechtstreeks te gebruiken; zonder deze brug valt
+    Scrapy terug op self.start_urls (die BaseSpider nooit definieert), met
+    een AttributeError tot gevolg.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'common.py'
+    if not fpath.exists():
+        print(f"  common.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    if 'async def start(self)' in src:
+        print("  common.py: start() bridge bestaat al - overslaan")
+        return True
+
+    marker = '  def start_requests(self):'
+    if marker not in src:
+        print("  common.py: start_requests() niet gevonden - overslaan")
+        return False
+
+    bridge = (
+        '  async def start(self):\n'
+        '    for request in self.start_requests():\n'
+        '      yield request\n\n'
+    )
+    new_src = src.replace(marker, bridge + marker, 1)
+    fpath.write_text(new_src)
+    print("  ✅ common.py: start() bridge naar start_requests() toegevoegd")
+    return True
+
+
 def main():
     print("=== Scraper patch script ===")
     print(f"Scraper directory: {SCRAPER_DIR}")
@@ -167,6 +201,7 @@ def main():
 
     patch_players()
     patch_appearances()
+    patch_common()
     print("=== Patches klaar ===")
 
 
