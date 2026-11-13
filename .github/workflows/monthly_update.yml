@@ -9,6 +9,9 @@ jobs:
   scrape:
     runs-on: self-hosted
     timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout repo
