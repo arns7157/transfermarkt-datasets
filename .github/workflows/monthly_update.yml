@@ -775,6 +775,10 @@ jobs:
               s = s.replace(chr(226)+chr(130)+chr(172), 'EUR')
               s = s.replace(chr(194), '')
               return s
+          def club_name(v):
+              if isinstance(v, dict):
+                  return v.get('clubName', '') or ''
+              return v or ''
           # ── TRANSFERS ──
           # Laad transfers: probeer transfers_raw.json (scraper) en transfers.json (bestaand)
           raw_transfers = load_jsonl(RAW / 'transfers_raw.json')
@@ -790,8 +794,8 @@ jobs:
                   'player_id':                player_id,
                   'transfer_date':            t.get('transfer_date', '') or t.get('date', '') or t.get('transferDate', ''),
                   'transfer_season':          t.get('transfer_season', '') or t.get('season', ''),
-                  'from_club_name':           str(t.get('from_club_name', '') or t.get('from', '') or t.get('fromClubName', '')),
-                  'to_club_name':             str(t.get('to_club_name', '') or t.get('to', '') or t.get('toClubName', '')),
+                  'from_club_name':           club_name(t.get('from_club_name') or t.get('from') or t.get('fromClubName')),
+                  'to_club_name':             club_name(t.get('to_club_name') or t.get('to') or t.get('toClubName')),
                   'transfer_fee':             _fix_encoding(t.get('transfer_fee', '') or t.get('fee', '') or t.get('transferFee', '')),
                   'market_value_at_transfer': _fix_encoding(t.get('market_value_in_eur', '') or t.get('mv', '') or t.get('marketValue', '')),
               })
