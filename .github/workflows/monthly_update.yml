@@ -68,19 +68,13 @@ jobs:
           pip install aiohttp asyncio
           echo 'USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"' >> /tmp/scraper/tfmkt/settings.py
           echo 'ROBOTSTXT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"' >> /tmp/scraper/tfmkt/settings.py
-          # Vertraag en spreid requests licht, om minder op een uniforme bot-burst
-          # te lijken voor Transfermarkt's bot-detectie (die GitHub Actions' IP's
-          # soms blokkeert) - zonder de doorvoersnelheid te veel te drukken, want
-          # dit scrapet duizenden spelerspagina's binnen het job-tijdsbudget.
-          echo 'DOWNLOAD_DELAY = 0.5' >> /tmp/scraper/tfmkt/settings.py
-          echo 'RANDOMIZE_DOWNLOAD_DELAY = True' >> /tmp/scraper/tfmkt/settings.py
-          echo 'CONCURRENT_REQUESTS = 8' >> /tmp/scraper/tfmkt/settings.py
-          echo 'CONCURRENT_REQUESTS_PER_DOMAIN = 8' >> /tmp/scraper/tfmkt/settings.py
-          echo 'AUTOTHROTTLE_ENABLED = True' >> /tmp/scraper/tfmkt/settings.py
-          echo 'AUTOTHROTTLE_START_DELAY = 1' >> /tmp/scraper/tfmkt/settings.py
-          echo 'AUTOTHROTTLE_MAX_DELAY = 10' >> /tmp/scraper/tfmkt/settings.py
-          echo 'AUTOTHROTTLE_TARGET_CONCURRENCY = 4.0' >> /tmp/scraper/tfmkt/settings.py
-          echo 'RETRY_TIMES = 5' >> /tmp/scraper/tfmkt/settings.py
+          # Deze self-hosted runner draait op een residentiële/werk-IP die niet
+          # door Transfermarkt's bot-detectie geblokkeerd wordt (in tegenstelling
+          # tot GitHub-hosted runners), dus geen throttling meer nodig hier - gewoon
+          # Scrapy's eigen standaarden voor maximale doorvoersnelheid.
+          echo 'CONCURRENT_REQUESTS = 32' >> /tmp/scraper/tfmkt/settings.py
+          echo 'CONCURRENT_REQUESTS_PER_DOMAIN = 32' >> /tmp/scraper/tfmkt/settings.py
+          echo 'RETRY_TIMES = 3' >> /tmp/scraper/tfmkt/settings.py
           python3 $GITHUB_WORKSPACE/patch_scraper.py "$(cygpath -w /tmp/scraper 2>/dev/null || echo /tmp/scraper)"
 
       - name: Maak output map aan
