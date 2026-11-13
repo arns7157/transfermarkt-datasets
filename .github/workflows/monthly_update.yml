@@ -22,7 +22,7 @@ jobs:
       - name: Install transfermarkt-scraper
         run: |
           pip install poetry
-          git clone https://github.com/dcaribou/transfermarkt-scraper.git /tmp/scraper
+          git clone --branch v0.4.0 https://github.com/dcaribou/transfermarkt-scraper.git /tmp/scraper
           cd /tmp/scraper
           poetry config virtualenvs.create false
           poetry install --without dev
@@ -55,9 +55,9 @@ jobs:
           cd /tmp/scraper
           for SEASON in 2024 2025; do
             echo "=== Clubs seizoen $SEASON ==="
-            python -m tfmkt clubs \
-              -p $GITHUB_WORKSPACE/data/competitions.json \
-              -s $SEASON \
+            scrapy crawl clubs \
+              -a parents=$GITHUB_WORKSPACE/data/competitions.json \
+              -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/clubs.json || true
           done
           echo "Clubs nieuw: $(wc -l < $GITHUB_WORKSPACE/data/raw/clubs.json)"
@@ -67,9 +67,9 @@ jobs:
           cd /tmp/scraper
           for SEASON in 2024 2025; do
             echo "=== Spelers seizoen $SEASON ==="
-            python -m tfmkt players \
-              -p $GITHUB_WORKSPACE/data/raw/clubs.json \
-              -s $SEASON \
+            scrapy crawl players \
+              -a parents=$GITHUB_WORKSPACE/data/raw/clubs.json \
+              -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/players.json || true
           done
           echo "Spelers nieuw: $(wc -l < $GITHUB_WORKSPACE/data/raw/players.json)"
@@ -313,9 +313,9 @@ jobs:
           cd /tmp/scraper
           for SEASON in 2024 2025; do
             echo "=== Optredens seizoen $SEASON ==="
-            python -m tfmkt appearances \
-              -p $GITHUB_WORKSPACE/data/raw/players.json \
-              -s $SEASON \
+            scrapy crawl appearances \
+              -a parents=$GITHUB_WORKSPACE/data/raw/players.json \
+              -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/appearances.json || true
           done
           echo "Optredens nieuw: $(wc -l < $GITHUB_WORKSPACE/data/raw/appearances.json)"
@@ -327,9 +327,9 @@ jobs:
           cd /tmp/scraper
           for SEASON in 2024 2025; do
             echo "=== Wedstrijden seizoen $SEASON ==="
-            python -m tfmkt games \
-              -p $GITHUB_WORKSPACE/data/competitions.json \
-              -s $SEASON \
+            scrapy crawl games \
+              -a parents=$GITHUB_WORKSPACE/data/competitions.json \
+              -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/games.json || true
           done
           echo "Wedstrijden nieuw: $(wc -l < $GITHUB_WORKSPACE/data/raw/games.json)"
