@@ -19,6 +19,20 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Bepaal actuele seizoenen
+        run: |
+          MONTH=$(date -u +%-m)
+          YEAR=$(date -u +%Y)
+          if [ "$MONTH" -ge 7 ]; then
+            CURRENT_SEASON=$YEAR
+          else
+            CURRENT_SEASON=$((YEAR - 1))
+          fi
+          PREV_SEASON=$((CURRENT_SEASON - 1))
+          echo "CURRENT_SEASON=$CURRENT_SEASON" >> $GITHUB_ENV
+          echo "PREV_SEASON=$PREV_SEASON" >> $GITHUB_ENV
+          echo "Seizoenen: $PREV_SEASON (vorig) en $CURRENT_SEASON (huidig)"
+
       - name: Install transfermarkt-scraper
         run: |
           pip install poetry
@@ -54,7 +68,7 @@ jobs:
       - name: Stap 1 - Clubs scrapen
         run: |
           cd /tmp/scraper
-          for SEASON in 2024 2025; do
+          for SEASON in $PREV_SEASON $CURRENT_SEASON; do
             echo "=== Clubs seizoen $SEASON ==="
             scrapy crawl clubs \
               -a parents=$GITHUB_WORKSPACE/data/competitions.json \
@@ -66,7 +80,7 @@ jobs:
       - name: Stap 2 - Spelers scrapen
         run: |
           cd /tmp/scraper
-          for SEASON in 2024 2025; do
+          for SEASON in $PREV_SEASON $CURRENT_SEASON; do
             echo "=== Spelers seizoen $SEASON ==="
             scrapy crawl players \
               -a parents=$GITHUB_WORKSPACE/data/raw/clubs.json \
@@ -312,7 +326,7 @@ jobs:
         continue-on-error: true
         run: |
           cd /tmp/scraper
-          for SEASON in 2024 2025; do
+          for SEASON in $PREV_SEASON $CURRENT_SEASON; do
             echo "=== Optredens seizoen $SEASON ==="
             scrapy crawl appearances \
               -a parents=$GITHUB_WORKSPACE/data/raw/players.json \
@@ -326,7 +340,7 @@ jobs:
         continue-on-error: true
         run: |
           cd /tmp/scraper
-          for SEASON in 2024 2025; do
+          for SEASON in $PREV_SEASON $CURRENT_SEASON; do
             echo "=== Wedstrijden seizoen $SEASON ==="
             scrapy crawl games \
               -a parents=$GITHUB_WORKSPACE/data/competitions.json \
