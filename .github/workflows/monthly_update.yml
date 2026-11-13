@@ -62,8 +62,8 @@ jobs:
           git clone --branch v0.4.0 https://github.com/dcaribou/transfermarkt-scraper.git /tmp/scraper
           cd /tmp/scraper
           rm -f poetry.lock
-          poetry config virtualenvs.create false
-          poetry install --without dev
+          python3 -m poetry config virtualenvs.create false
+          python3 -m poetry install --without dev
           pip install aiohttp asyncio
           echo 'USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"' >> /tmp/scraper/tfmkt/settings.py
           echo 'ROBOTSTXT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"' >> /tmp/scraper/tfmkt/settings.py
@@ -106,7 +106,7 @@ jobs:
           cd /tmp/scraper
           for SEASON in $SEASONS; do
             echo "=== Clubs seizoen $SEASON ==="
-            scrapy crawl clubs \
+            python3 -m scrapy crawl clubs \
               -a parents=$GITHUB_WORKSPACE/data/competitions.json \
               -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/clubs.json || true
@@ -118,7 +118,7 @@ jobs:
           cd /tmp/scraper
           for SEASON in $SEASONS; do
             echo "=== Spelers seizoen $SEASON ==="
-            scrapy crawl players \
+            python3 -m scrapy crawl players \
               -a parents=$GITHUB_WORKSPACE/data/raw/clubs.json \
               -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/players.json || true
@@ -489,7 +489,7 @@ jobs:
           cd /tmp/scraper
           for SEASON in $SEASONS; do
             echo "=== Wedstrijden seizoen $SEASON ==="
-            scrapy crawl games \
+            python3 -m scrapy crawl games \
               -a parents=$GITHUB_WORKSPACE/data/competitions.json \
               -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/games.json || true
