@@ -86,7 +86,7 @@ sync:
 
 # run streamlit app locally
 streamlit_local:
-    streamlit run streamlit/01_👋_about.py --server.port 8501 --browser.serverPort 8501
+    streamlit run streamlit/Home.py --server.port 8501 --browser.serverPort 8501
 
 # run streamlit app in a local docker
 streamlit_docker:
