@@ -17,10 +17,13 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Controleer Python
+        run: |
+          # Op de self-hosted runner gebruiken we de al geïnstalleerde Python
+          # i.p.v. actions/setup-python, die op deze machine een installer
+          # probeert te draaien die geblokkeerd wordt.
+          python3 --version
+          pip3 --version || pip --version
 
       - name: Bepaal actuele seizoenen
         run: |
