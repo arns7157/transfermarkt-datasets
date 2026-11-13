@@ -81,7 +81,7 @@ jobs:
           echo 'AUTOTHROTTLE_MAX_DELAY = 10' >> /tmp/scraper/tfmkt/settings.py
           echo 'AUTOTHROTTLE_TARGET_CONCURRENCY = 4.0' >> /tmp/scraper/tfmkt/settings.py
           echo 'RETRY_TIMES = 5' >> /tmp/scraper/tfmkt/settings.py
-          python3 $GITHUB_WORKSPACE/patch_scraper.py
+          python3 $GITHUB_WORKSPACE/patch_scraper.py "$(cygpath -w /tmp/scraper 2>/dev/null || echo /tmp/scraper)"
 
       - name: Maak output map aan
         run: mkdir -p data/raw data/csv

@@ -10,11 +10,12 @@ Repareert twee bekende fragiele plekken:
 
 Wordt uitgevoerd door de workflow NA het clonen van de scraper.
 """
+import os
 import re
 from pathlib import Path
 import sys
 
-SCRAPER_DIR = Path('/tmp/scraper')
+SCRAPER_DIR = Path(sys.argv[1] if len(sys.argv) > 1 else os.environ.get('SCRAPER_DIR', '/tmp/scraper'))
 
 def patch_players():
     """Vervang de fragile parse() in players.py door een robuuste versie."""
