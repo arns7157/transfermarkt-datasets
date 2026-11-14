@@ -576,8 +576,12 @@ jobs:
           existing_clubs = load_csv_existing(OUT / 'clubs.csv')
           club_id_map = {r['club_id']: r for r in existing_clubs if r.get('club_id')}
           for r in new_club_rows:
-              if r.get('club_id'):
-                  club_id_map[str(r['club_id'])] = r
+              cid = str(r.get('club_id', ''))
+              if cid:
+                  old_row = club_id_map.get(cid)
+                  if old_row and not r.get('name') and old_row.get('name'):
+                      r['name'] = old_row['name']
+                  club_id_map[cid] = r
           merged_clubs = list(club_id_map.values())
           if merged_clubs:
               with open(OUT / 'clubs.csv', 'w', newline='', encoding='utf-8') as f:
@@ -650,6 +654,10 @@ jobs:
                       for mv_col in ['market_value_in_eur', 'highest_market_value_in_eur']:
                           if not r.get(mv_col) and old_row.get(mv_col):
                               r[mv_col] = old_row[mv_col]
+                      # Bewaar naam/club-naam als nieuwe scrape ze niet kon vinden
+                      for name_col in ['name', 'first_name', 'last_name', 'current_club_name']:
+                          if not r.get(name_col) and old_row.get(name_col):
+                              r[name_col] = old_row[name_col]
                   player_id_map[pid] = r
           merged_players = list(player_id_map.values())
           if merged_players:

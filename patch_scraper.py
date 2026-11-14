@@ -85,6 +85,134 @@ def patch_players():
     return True
 
 
+def patch_clubs():
+    """Voegt club-naam extractie toe aan clubs.py.
+
+    De originele parse() haalt alleen de href van elk team uit de
+    competitie-tabel, nooit de naam zelf. Daardoor is 'name' in de
+    workflow-merge altijd leeg. Fix: pak ook de anchor-tekst (of title-
+    attribuut als fallback) uit dezelfde tabelcel en geef hem mee in
+    cb_kwargs['base'], zodat hij in parse_details()'s {**base, **attributes}
+    terechtkomt.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'clubs.py'
+    if not fpath.exists():
+        print(f"  clubs.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    if 'extract_team_name' in src:
+        print("  clubs.py: naam-extractie bestaat al - overslaan")
+        return True
+
+    old_extract = (
+        "    def extract_team_href(row):\n"
+        "        \"\"\"It extracts one team's href from a teams' table row\"\"\"\n"
+        "        return row.css('td')[1].css('a::attr(href)').get()\n"
+    )
+    new_extract = (
+        old_extract + "\n"
+        "    def extract_team_name(row):\n"
+        "        \"\"\"It extracts one team's display name from a teams' table row\"\"\"\n"
+        "        name = row.css('td')[1].css('a::text').get()\n"
+        "        if name:\n"
+        "            return name.strip()\n"
+        "        return row.css('td')[1].css('a::attr(title)').get()\n"
+    )
+    if old_extract not in src:
+        print("  clubs.py: extract_team_href() niet gevonden - overslaan")
+        return False
+    src = src.replace(old_extract, new_extract, 1)
+
+    old_cb = (
+        "        cb_kwargs = {\n"
+        "          'base' : {\n"
+        "            'type': 'club',\n"
+        "            'href': href_strip_season,\n"
+        "            'parent': parent\n"
+        "          }\n"
+        "        }\n"
+    )
+    new_cb = (
+        "        name = extract_team_name(row)\n"
+        "\n"
+        "        cb_kwargs = {\n"
+        "          'base' : {\n"
+        "            'type': 'club',\n"
+        "            'href': href_strip_season,\n"
+        "            'name': name,\n"
+        "            'parent': parent\n"
+        "          }\n"
+        "        }\n"
+    )
+    if old_cb not in src:
+        print("  clubs.py: cb_kwargs block niet gevonden - overslaan")
+        return False
+    src = src.replace(old_cb, new_cb, 1)
+
+    fpath.write_text(src)
+    print("  ✅ clubs.py: club-naam extractie toegevoegd")
+    return True
+
+
+def patch_player_names():
+    """Voegt voornaam/achternaam extractie toe aan players.py.
+
+    parse_details() haalt tientallen velden uit de profielpagina, maar
+    nooit de naam zelf - 'name'/'last_name' bestaan niet in de originele
+    scraper. De workflow-merge verwacht wel degelijk dat 'name' (voornaam)
+    en 'last_name' (achternaam) bestaan (zie monthly_update.yml, waar ze
+    worden samengevoegd tot de volledige naam).
+
+    Bron: de headline op de profielpagina, bv.
+      <h1 class="data-header__headline-wrapper">
+        <span class="data-header__shirt-number">#11</span>
+        Kevin <strong>De Bruyne</strong>
+      </h1>
+    De voornaam is directe tekst van de h1 (shirtnummer-span en <strong>
+    tellen niet mee); de achternaam staat in <strong>.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'players.py'
+    if not fpath.exists():
+        print(f"  players.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    if "attributes['last_name']" in src:
+        print("  players.py: naam-extractie bestaat al - overslaan")
+        return True
+
+    marker = "    attributes = {}\n\n    attributes['name_in_home_country']"
+    if marker not in src:
+        print("  players.py: anker voor naam-extractie niet gevonden - overslaan")
+        return False
+
+    name_block = (
+        "    attributes = {}\n"
+        "\n"
+        "    # PATCH: voornaam/achternaam uit de headline halen (nooit in de originele scraper)\n"
+        "    first_name_parts = [\n"
+        "      t.strip() for t in response.xpath(\n"
+        "        \"//h1[contains(@class,'data-header__headline-wrapper')]/text()\"\n"
+        "      ).getall() if t.strip()\n"
+        "    ]\n"
+        "    attributes['name'] = ' '.join(first_name_parts)\n"
+        "    attributes['last_name'] = self.safe_strip(\n"
+        "      response.xpath(\n"
+        "        \"//h1[contains(@class,'data-header__headline-wrapper')]/strong/text()\"\n"
+        "      ).get()\n"
+        "    ) or ''\n"
+        "\n"
+        "    attributes['name_in_home_country']"
+    )
+    src = src.replace(marker, name_block, 1)
+    fpath.write_text(src)
+    print("  ✅ players.py: voornaam/achternaam extractie toegevoegd")
+    return True
+
+
 def patch_appearances():
     """Fix appearances.py waar full_stats_href None kan zijn.
 
@@ -200,6 +328,8 @@ def main():
         sys.exit(1)
 
     patch_players()
+    patch_clubs()
+    patch_player_names()
     patch_appearances()
     patch_common()
     print("=== Patches klaar ===")
