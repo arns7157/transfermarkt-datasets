@@ -12,6 +12,13 @@ jobs:
     defaults:
       run:
         shell: 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -eo pipefail {0}'
+    env:
+      # Op deze Windows self-hosted runner is Python's stdout standaard cp1252
+      # i.p.v. UTF-8 wanneer het niet aan een echte console hangt (bv. via de
+      # Actions runner's process pipe). Zonder dit crasht elke print() met een
+      # emoji of ander non-ASCII teken (UnicodeEncodeError).
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: 'utf-8'
 
     steps:
       - name: Checkout repo
