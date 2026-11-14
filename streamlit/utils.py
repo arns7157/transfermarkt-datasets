@@ -118,7 +118,14 @@ def inject_theme() -> None:
     st.markdown(
         """
         <style>
-        #MainMenu, footer, header {visibility: hidden;}
+        /* Verberg Deploy-knop en hamburger-menu, maar NIET de hele header: die
+           bevat ook de "sidebar weer openen"-knop die verschijnt zodra de
+           sidebar is ingeklapt. Hem verbergen laat je zonder navigatie en
+           zonder manier om de sidebar terug te krijgen. */
+        footer {display: none;}
+        header[data-testid="stHeader"] {background: transparent;}
+        div[data-testid="stAppDeployButton"],
+        button[data-testid="stMainMenuButton"] {display: none;}
         .block-container {padding-top: 2rem; max-width: 1200px;}
         div[data-testid="stMetric"] {
             background: #151B23;

@@ -126,7 +126,12 @@ else:
         ["date", "competition_id", "goals", "assists", "minutes_played", "yellow_cards", "red_cards"]
     ]
     recent.columns = ["Datum", "Competitie", "Goals", "Assists", "Minuten", "Geel", "Rood"]
-    st.dataframe(recent, width="stretch", hide_index=True)
+    st.dataframe(
+        recent,
+        width="stretch",
+        hide_index=True,
+        column_config={"Datum": st.column_config.DateColumn(format="DD/MM/YYYY")},
+    )
 
 st.divider()
 st.subheader("Transferhistorie")
@@ -138,4 +143,9 @@ else:
         ["transfer_date", "from_club_name", "to_club_name", "transfer_fee", "market_value_at_transfer"]
     ].copy()
     tdisp.columns = ["Datum", "Van", "Naar", "Transfersom", "Marktwaarde bij transfer"]
-    st.dataframe(tdisp, width="stretch", hide_index=True)
+    st.dataframe(
+        tdisp,
+        width="stretch",
+        hide_index=True,
+        column_config={"Datum": st.column_config.DateColumn(format="DD/MM/YYYY")},
+    )
