@@ -3,18 +3,16 @@ from datetime import datetime, timedelta
 import pandas as pd
 import streamlit as st
 
-from utils import format_money, load_appearances, load_players, load_valuations
+from utils import format_money, inject_theme, load_players, load_valuations, render_header
 
 st.set_page_config(page_title="Signalen", page_icon="🚨", layout="wide")
-st.title("🚨 Signalen")
+inject_theme()
+render_header("Signalen", "Aflopende contracten en de grootste stijgers/dalers in marktwaarde.")
 
 players = load_players()
 valuations = load_valuations()
-appearances = load_appearances()
 
-tab_contract, tab_value, tab_young = st.tabs(
-    ["Aflopende contracten", "Snel veranderende marktwaarde", "Hoge output voor leeftijd"]
-)
+tab_contract, tab_value = st.tabs(["Aflopende contracten", "Snel veranderende marktwaarde"])
 
 with tab_contract:
     months = st.slider("Binnen hoeveel maanden loopt het contract af?", 1, 24, 6, key="contract_months")
@@ -29,7 +27,12 @@ with tab_contract:
     ].copy()
     disp["market_value_in_eur"] = disp["market_value_in_eur"].map(format_money)
     disp.columns = ["Naam", "Leeftijd", "Positie", "Club", "Contract tot", "Marktwaarde"]
-    st.dataframe(disp, width="stretch", hide_index=True)
+    st.dataframe(
+        disp,
+        width="stretch",
+        hide_index=True,
+        column_config={"Contract tot": st.column_config.DateColumn(format="DD/MM/YYYY")},
+    )
 
 with tab_value:
     months_back = st.slider("Vergelijk met hoeveel maanden geleden?", 1, 24, 6, key="value_months")
@@ -70,27 +73,3 @@ with tab_value:
         disp_down["verandering_pct"] = disp_down["verandering_pct"].round(1)
         disp_down.columns = ["Naam", "Club", "Positie", "Toen", "Nu", "% verandering"]
         st.dataframe(disp_down, width="stretch", hide_index=True)
-
-with tab_young:
-    max_age = st.slider("Maximale leeftijd", 16, 30, 21, key="young_max_age")
-
-    season_totals = (
-        appearances.groupby("player_id")
-        .agg(
-            wedstrijden=("appearance_id", "count"),
-            minuten=("minutes_played", "sum"),
-            goals=("goals", "sum"),
-            assists=("assists", "sum"),
-        )
-        .reset_index()
-    )
-    young = players[players["age"] <= max_age].merge(season_totals, on="player_id", how="inner")
-    young = young[young["minuten"] > 0].sort_values("minuten", ascending=False)
-
-    st.caption(f"{len(young)} spelers van {max_age} jaar of jonger met speelminuten dit seizoen")
-    disp = young[
-        ["name", "age", "position", "current_club_name", "wedstrijden", "minuten", "goals", "assists", "market_value_in_eur"]
-    ].copy()
-    disp["market_value_in_eur"] = disp["market_value_in_eur"].map(format_money)
-    disp.columns = ["Naam", "Leeftijd", "Positie", "Club", "Wedstrijden", "Minuten", "Goals", "Assists", "Marktwaarde"]
-    st.dataframe(disp.head(50), width="stretch", hide_index=True)

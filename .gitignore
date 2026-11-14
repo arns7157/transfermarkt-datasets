@@ -66,3 +66,10 @@ storage
 
 # generated zip archive
 *.zip
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+
+# Locally installed agent skills (personal tooling, not project content)
+.agents/
+.claude/
+skills-lock.json

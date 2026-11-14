@@ -2,13 +2,23 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from utils import format_money, load_appearances, load_players, load_valuations, player_label
+from utils import (
+    current_season_appearances,
+    format_money,
+    inject_theme,
+    load_appearances,
+    load_players,
+    load_valuations,
+    player_label,
+    render_header,
+)
 
 st.set_page_config(page_title="Spelers vergelijken", page_icon="⚖️", layout="wide")
-st.title("⚖️ Spelers vergelijken")
+inject_theme()
+render_header("Vergelijken", "Zet 2 tot 4 spelers naast elkaar.")
 
 players = load_players().sort_values("name")
-appearances = load_appearances()
+appearances = current_season_appearances(load_appearances())
 valuations = load_valuations()
 
 labels = {pid: player_label(row) for pid, row in zip(players["player_id"], players.to_dict("records"))}
@@ -60,5 +70,7 @@ else:
         color="Speler",
         markers=True,
         labels={"date": "Datum", "market_value_in_eur": "Marktwaarde (€)"},
+        color_discrete_sequence=["#22C55E", "#3B82F6", "#F59E0B", "#EF4444"],
     )
+    fig.update_layout(plot_bgcolor="#0B0F14", paper_bgcolor="#0B0F14", font_color="#E5E7EB")
     st.plotly_chart(fig, width="stretch")
