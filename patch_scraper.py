@@ -320,6 +320,41 @@ def patch_common():
     return True
 
 
+def patch_club_tiers():
+    """Laat de clubs-spider ook second_tier competities verwerken.
+
+    start_requests() in common.py slaat van oudsher alles behalve
+    'first_tier' over voor de clubs-spider. Daardoor worden clubs/spelers
+    van 2e klasses (BE2, PO2, TR2, A2, C2, NL2, GRS2, ...) nooit ververst -
+    enkel wedstrijden (games-spider), want die heeft deze beperking niet.
+    Playoff-competities blijven overgeslagen: die pagina's hebben geen
+    spelerslijst-tabel, dus clubs.py's assert(len(with_teams_info) == 1)
+    zou daar toch altijd falen.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'common.py'
+    if not fpath.exists():
+        print(f"  common.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    old_check = "if self.name == 'clubs' and item['competition_type'] != 'first_tier':"
+    new_check = "if self.name == 'clubs' and item['competition_type'] not in ('first_tier', 'second_tier'):"
+
+    if new_check in src:
+        print("  common.py: second_tier-patch bestaat al - overslaan")
+        return True
+
+    if old_check not in src:
+        print("  common.py: first_tier-check niet gevonden - overslaan")
+        return False
+
+    new_src = src.replace(old_check, new_check, 1)
+    fpath.write_text(new_src)
+    print("  ✅ common.py: clubs-spider verwerkt nu ook second_tier competities")
+    return True
+
+
 def main():
     print("=== Scraper patch script ===")
     print(f"Scraper directory: {SCRAPER_DIR}")
@@ -332,6 +367,7 @@ def main():
     patch_player_names()
     patch_appearances()
     patch_common()
+    patch_club_tiers()
     print("=== Patches klaar ===")
 
 

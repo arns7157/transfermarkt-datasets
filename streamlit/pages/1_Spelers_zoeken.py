@@ -4,14 +4,18 @@ from utils import current_season_appearances, inject_theme, load_appearances, lo
 
 st.set_page_config(page_title="Spelers zoeken", page_icon="🔍", layout="wide")
 inject_theme()
-render_header("Spelers zoeken", "Filter het volledige spelersbestand van de 6 gevolgde competities.")
 
 players = load_players()
 competitions = load_competitions()
 appearances = load_appearances()
 
 comp_names = competitions.set_index("competition_id")["name"].to_dict()
+comp_countries = competitions.set_index("competition_id")["country"].to_dict()
 players["competition_name"] = players["current_club_domestic_competition_id"].map(comp_names)
+players["country"] = players["current_club_domestic_competition_id"].map(comp_countries)
+
+n_competities = players["current_club_domestic_competition_id"].nunique()
+render_header("Spelers zoeken", f"Filter het volledige spelersbestand van de {n_competities} gevolgde competities.")
 
 season_apps = current_season_appearances(appearances)
 season_matches = season_apps.groupby("player_id").size().rename("matches_this_season")
@@ -21,10 +25,15 @@ players["matches_this_season"] = players["matches_this_season"].fillna(0).astype
 with st.sidebar:
     st.header("Filters")
 
-    comp_options = sorted(players["competition_name"].dropna().unique())
+    country_options = sorted(players["country"].dropna().unique())
+    selected_countries = st.multiselect("Land", country_options)
+
+    country_scoped = players[players["country"].isin(selected_countries)] if selected_countries else players
+
+    comp_options = sorted(country_scoped["competition_name"].dropna().unique())
     selected_comps = st.multiselect("Competitie", comp_options)
 
-    scoped = players[players["competition_name"].isin(selected_comps)] if selected_comps else players
+    scoped = country_scoped[country_scoped["competition_name"].isin(selected_comps)] if selected_comps else country_scoped
 
     club_options = sorted(scoped["current_club_name"].dropna().unique())
     selected_clubs = st.multiselect("Club", club_options)
@@ -52,6 +61,8 @@ with st.sidebar:
         st.rerun()
 
 filtered = players.copy()
+if selected_countries:
+    filtered = filtered[filtered["country"].isin(selected_countries)]
 if selected_comps:
     filtered = filtered[filtered["competition_name"].isin(selected_comps)]
 if selected_clubs:
@@ -83,6 +94,7 @@ display = filtered[
         "sub_position",
         "foot",
         "current_club_name",
+        "country",
         "competition_name",
         "matches_this_season",
         "market_value_m",
@@ -97,6 +109,7 @@ display = filtered[
         "sub_position": "Subpositie",
         "foot": "Voet",
         "current_club_name": "Club",
+        "country": "Land",
         "competition_name": "Competitie",
         "matches_this_season": "Wedstrijden (seizoen)",
         "market_value_m": "Marktwaarde (M€)",

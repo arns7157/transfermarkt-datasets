@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '0 4 * * 1'
   workflow_dispatch:
+    inputs:
+      batch:
+        description: 'Welke competities-batch scrapen?'
+        type: choice
+        default: core
+        options:
+          - core
+          - big5
+          - eastern_europe
 
 jobs:
   scrape:
@@ -32,8 +41,16 @@ jobs:
           python3 --version
           pip3 --version || pip --version
 
-      - name: Bepaal actuele seizoenen
+      - name: Bepaal batch en actuele seizoenen
         run: |
+          # Batch wordt altijd handmatig gekozen bij het starten van de run
+          # (geen automatische rotatie: de self-hosted runner draait toch
+          # enkel wanneer iemand hem zelf aanzet). Schedule-triggers hebben
+          # geen inputs, die vallen terug op 'core'.
+          BATCH="${{ github.event.inputs.batch || 'core' }}"
+          echo "BATCH=$BATCH" >> $GITHUB_ENV
+          echo "Gekozen batch: $BATCH"
+
           MONTH=$(date -u +%-m)
           YEAR=$(date -u +%Y)
           if [ "$MONTH" -ge 7 ]; then
@@ -46,11 +63,28 @@ jobs:
           STATE_FILE="data/csv/.scrape_state.json"
           LAST_FINALIZED=""
           if [ -f "$STATE_FILE" ]; then
-            LAST_FINALIZED=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('last_finalized_season') or '')")
+            LAST_FINALIZED=$(STATE_FILE="$STATE_FILE" BATCH="$BATCH" python3 << 'PYEOF'
+          import json
+          import os
+
+          state = json.load(open(os.environ['STATE_FILE']))
+          finalized = state.get('last_finalized_season')
+          batch = os.environ['BATCH']
+          if isinstance(finalized, dict):
+              print(finalized.get(batch) or '')
+          else:
+              # Oude platte state (van vóór de batches) gold enkel voor de 'core' batch.
+              print(finalized or '' if batch == 'core' else '')
+          PYEOF
+          )
           fi
 
-          # Vorig seizoen is afgerond en al eens volledig opgehaald na die afronding:
-          # niet opnieuw scrapen. Huidig seizoen loopt nog, dus altijd opnieuw.
+          # Vorig seizoen is afgerond en voor DEZE batch al eens volledig
+          # opgehaald na die afronding: niet opnieuw scrapen. Huidig seizoen
+          # loopt nog, dus altijd opnieuw. Elke batch houdt dit onafhankelijk
+          # bij, anders zou een batch die nog nooit gedraaid heeft seizoenen
+          # overslaan enkel omdat een ANDERE batch die al als afgerond
+          # markeerde.
           if [ "$LAST_FINALIZED" = "$PREV_SEASON" ]; then
             SEASONS="$CURRENT_SEASON"
           else
@@ -60,7 +94,7 @@ jobs:
           echo "CURRENT_SEASON=$CURRENT_SEASON" >> $GITHUB_ENV
           echo "PREV_SEASON=$PREV_SEASON" >> $GITHUB_ENV
           echo "SEASONS=$SEASONS" >> $GITHUB_ENV
-          echo "Laatst afgerond seizoen (state): ${LAST_FINALIZED:-geen}"
+          echo "Laatst afgerond seizoen voor batch '$BATCH' (state): ${LAST_FINALIZED:-geen}"
           echo "Te scrapen seizoenen deze run: $SEASONS"
 
       - name: Install transfermarkt-scraper
@@ -109,7 +143,7 @@ jobs:
           for SEASON in $SEASONS; do
             echo "=== Clubs seizoen $SEASON ==="
             python3 -m scrapy crawl clubs \
-              -a parents=$GITHUB_WORKSPACE/data/competitions.json \
+              -a parents=$GITHUB_WORKSPACE/data/competitions/$BATCH.json \
               -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/clubs.json || true
           done
@@ -492,7 +526,7 @@ jobs:
           for SEASON in $SEASONS; do
             echo "=== Wedstrijden seizoen $SEASON ==="
             python3 -m scrapy crawl games \
-              -a parents=$GITHUB_WORKSPACE/data/competitions.json \
+              -a parents=$GITHUB_WORKSPACE/data/competitions/$BATCH.json \
               -a season=$SEASON \
               >> $GITHUB_WORKSPACE/data/raw/games.json || true
           done
@@ -860,7 +894,20 @@ jobs:
           git config user.name "ScoutAI Bot"
           git config user.email "actions@users.noreply.github.com"
           for f in data/csv/*.csv; do [ -f "$f" ] && gzip -f "$f" || true; done
-          python3 -c "import json; json.dump({'last_finalized_season': $PREV_SEASON}, open('data/csv/.scrape_state.json', 'w'))"
+          BATCH="$BATCH" PREV_SEASON="$PREV_SEASON" python3 << 'PYEOF'
+          import json
+          import os
+          from pathlib import Path
+
+          state_path = Path('data/csv/.scrape_state.json')
+          state = json.load(open(state_path)) if state_path.exists() else {}
+          finalized = state.get('last_finalized_season')
+          if not isinstance(finalized, dict):
+              finalized = {}
+          finalized[os.environ['BATCH']] = int(os.environ['PREV_SEASON'])
+          state['last_finalized_season'] = finalized
+          json.dump(state, open(state_path, 'w'))
+          PYEOF
           git add data/csv/
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M)
           git commit -m "ScoutAI data update ${TIMESTAMP}" || echo "Geen wijzigingen"
