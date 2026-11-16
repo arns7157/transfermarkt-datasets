@@ -1,0 +1,96 @@
+{"type": "competition", "country_name": "Argentina", "country_code": "ARG1", "competition_type": "first_tier", "href": "/torneo-apertura/startseite/wettbewerb/ARG1"}
+{"type": "competition", "country_name": "Argentina", "country_code": "CDLP", "competition_type": "first_tier", "href": "/copa-de-la-liga-profesional-de-futbol-23-24-/startseite/wettbewerb/CDLP"}
+{"type": "competition", "country_name": "Argentina", "country_code": "AR1N", "competition_type": "first_tier", "href": "/professional-football-league-23-24-/startseite/wettbewerb/AR1N"}
+{"type": "competition", "country_name": "Argentina", "country_code": "ARGC", "competition_type": "first_tier", "href": "/torneo-clausura/startseite/wettbewerb/ARGC"}
+{"type": "competition", "country_name": "Argentina", "country_code": "ARG2", "competition_type": "second_tier", "href": "/primera-nacional/startseite/wettbewerb/ARG2"}
+{"type": "competition", "country_name": "Bolivia", "country_code": "BO1A", "competition_type": "first_tier", "href": "/division-profesional/startseite/wettbewerb/BO1A"}
+{"type": "competition", "country_name": "Bolivia", "country_code": "B1AP", "competition_type": "first_tier", "href": "/division-profesional-apertura/startseite/wettbewerb/B1AP"}
+{"type": "competition", "country_name": "Bolivia", "country_code": "BO1C", "competition_type": "first_tier", "href": "/division-profesional-clausura/startseite/wettbewerb/BO1C"}
+{"type": "competition", "country_name": "Bolivia", "country_code": "BOL2", "competition_type": "second_tier", "href": "/copa-simon-bolivar-2024-/startseite/wettbewerb/BOL2"}
+{"type": "competition", "country_name": "Bolivia", "country_code": "BOP2", "competition_type": "second_tier", "href": "/copa-simon-bolivar-playoff/startseite/wettbewerb/BOP2"}
+{"type": "competition", "country_name": "Brazil", "country_code": "BRA1", "competition_type": "first_tier", "href": "/campeonato-brasileiro-serie-a/startseite/wettbewerb/BRA1"}
+{"type": "competition", "country_name": "Brazil", "country_code": "BRA2", "competition_type": "second_tier", "href": "/campeonato-brasileiro-serie-b/startseite/wettbewerb/BRA2"}
+{"type": "competition", "country_name": "Canada", "country_code": "CDN1", "competition_type": "first_tier", "href": "/canadian-premier-league/startseite/wettbewerb/CDN1"}
+{"type": "competition", "country_name": "Canada", "country_code": "CA1F", "competition_type": "first_tier", "href": "/canadian-premier-league-fall-season/startseite/wettbewerb/CA1F"}
+{"type": "competition", "country_name": "Canada", "country_code": "CAN1", "competition_type": "first_tier", "href": "/canadian-premier-league-spring-season/startseite/wettbewerb/CAN1"}
+{"type": "competition", "country_name": "Chile", "country_code": "CLPD", "competition_type": "first_tier", "href": "/liga-de-primera/startseite/wettbewerb/CLPD"}
+{"type": "competition", "country_name": "Chile", "country_code": "CHLA", "competition_type": "first_tier", "href": "/torneo-apertura-2016-/startseite/wettbewerb/CHLA"}
+{"type": "competition", "country_name": "Chile", "country_code": "CHL1", "competition_type": "first_tier", "href": "/torneo-clausura-2017-/startseite/wettbewerb/CHL1"}
+{"type": "competition", "country_name": "Chile", "country_code": "CL2B", "competition_type": "second_tier", "href": "/liga-de-ascenso/startseite/wettbewerb/CL2B"}
+{"type": "competition", "country_name": "Chile", "country_code": "CHL2", "competition_type": "second_tier", "href": "/primera-b-apertura-2015-/startseite/wettbewerb/CHL2"}
+{"type": "competition", "country_name": "Chile", "country_code": "CH2C", "competition_type": "second_tier", "href": "/primera-b-clausura-2016-/startseite/wettbewerb/CH2C"}
+{"type": "competition", "country_name": "Colombia", "country_code": "COLP", "competition_type": "first_tier", "href": "/liga-dimayor-apertura/startseite/wettbewerb/COLP"}
+{"type": "competition", "country_name": "Colombia", "country_code": "C1P1", "competition_type": "first_tier", "href": "/liga-dimayor-liguilla-2020-/startseite/wettbewerb/C1P1"}
+{"type": "competition", "country_name": "Colombia", "country_code": "COL1", "competition_type": "first_tier", "href": "/liga-dimayor-finalizacion/startseite/wettbewerb/COL1"}
+{"type": "competition", "country_name": "Colombia", "country_code": "CO2T", "competition_type": "second_tier", "href": "/torneo-dimayor-i/startseite/wettbewerb/CO2T"}
+{"type": "competition", "country_name": "Colombia", "country_code": "CO22", "competition_type": "second_tier", "href": "/torneo-dimayor-ii/startseite/wettbewerb/CO22"}
+{"type": "competition", "country_name": "Costa Rica", "country_code": "CRPD", "competition_type": "first_tier", "href": "/primera-division-apertura/startseite/wettbewerb/CRPD"}
+{"type": "competition", "country_name": "Costa Rica", "country_code": "PDV1", "competition_type": "first_tier", "href": "/primera-division-clausura/startseite/wettbewerb/PDV1"}
+{"type": "competition", "country_name": "Costa Rica", "country_code": "CRPV", "competition_type": "first_tier", "href": "/primera-division-apertura-play-off/startseite/wettbewerb/CRPV"}
+{"type": "competition", "country_name": "Costa Rica", "country_code": "CIF", "competition_type": "first_tier", "href": "/primera-division-apertura-finale/startseite/wettbewerb/CIF"}
+{"type": "competition", "country_name": "Costa Rica", "country_code": "CISP", "competition_type": "first_tier", "href": "/primera-division-apertura-seg-fase-17-18-/startseite/wettbewerb/CISP"}
+{"type": "competition", "country_name": "Costa Rica", "country_code": "CVSP", "competition_type": "first_tier", "href": "/primera-division-clausura-2-stage-17-18-/startseite/wettbewerb/CVSP"}
+{"type": "competition", "country_name": "Costa Rica", "country_code": "CVF", "competition_type": "first_tier", "href": "/primera-division-clausura-finale/startseite/wettbewerb/CVF"}
+{"type": "competition", "country_name": "Costa Rica", "country_code": "PDV2", "competition_type": "first_tier", "href": "/primera-division-clausura-play-off/startseite/wettbewerb/PDV2"}
+{"type": "competition", "country_name": "Dominican Republic", "country_code": "DO1P", "competition_type": "first_tier", "href": "/liga-dominicana-de-futbol-liguilla/startseite/wettbewerb/DO1P"}
+{"type": "competition", "country_name": "Dominican Republic", "country_code": "DOM1", "competition_type": "first_tier", "href": "/liga-dominicana-de-futbol/startseite/wettbewerb/DOM1"}
+{"type": "competition", "country_name": "Dominican Republic", "country_code": "DOMP", "competition_type": "first_tier", "href": "/liga-dominicana-de-futbol-playoff/startseite/wettbewerb/DOMP"}
+{"type": "competition", "country_name": "Ecuador", "country_code": "EC1N", "competition_type": "first_tier", "href": "/ligapro-serie-a/startseite/wettbewerb/EC1N"}
+{"type": "competition", "country_name": "Ecuador", "country_code": "EL1A", "competition_type": "first_tier", "href": "/ligapro-serie-a-primera-etapa/startseite/wettbewerb/EL1A"}
+{"type": "competition", "country_name": "Ecuador", "country_code": "EL1S", "competition_type": "first_tier", "href": "/ligapro-serie-a-segunda-etapa/startseite/wettbewerb/EL1S"}
+{"type": "competition", "country_name": "Ecuador", "country_code": "LPPL", "competition_type": "first_tier", "href": "/ligapro-serie-a-tercera-etapa/startseite/wettbewerb/LPPL"}
+{"type": "competition", "country_name": "Ecuador", "country_code": "ECPE", "competition_type": "first_tier", "href": "/serie-a-primera-etapa/startseite/wettbewerb/ECPE"}
+{"type": "competition", "country_name": "Ecuador", "country_code": "ECSE", "competition_type": "first_tier", "href": "/serie-a-segunda-etapa/startseite/wettbewerb/ECSE"}
+{"type": "competition", "country_name": "Ecuador", "country_code": "EC2L", "competition_type": "second_tier", "href": "/liga-pro-serie-b/startseite/wettbewerb/EC2L"}
+{"type": "competition", "country_name": "El Salvador", "country_code": "SL1A", "competition_type": "first_tier", "href": "/primera-division-apertura/startseite/wettbewerb/SL1A"}
+{"type": "competition", "country_name": "El Salvador", "country_code": "SL1C", "competition_type": "first_tier", "href": "/primera-division-clausura/startseite/wettbewerb/SL1C"}
+{"type": "competition", "country_name": "Guatemala", "country_code": "GU1A", "competition_type": "first_tier", "href": "/national-league-apertura/startseite/wettbewerb/GU1A"}
+{"type": "competition", "country_name": "Guatemala", "country_code": "GU1C", "competition_type": "first_tier", "href": "/national-league-clausura/startseite/wettbewerb/GU1C"}
+{"type": "competition", "country_name": "Honduras", "country_code": "HO1A", "competition_type": "first_tier", "href": "/liga-nacional-apertura/startseite/wettbewerb/HO1A"}
+{"type": "competition", "country_name": "Honduras", "country_code": "HOC1", "competition_type": "first_tier", "href": "/liga-nacional-clausura/startseite/wettbewerb/HOC1"}
+{"type": "competition", "country_name": "Jamaica", "country_code": "JPL1", "competition_type": "first_tier", "href": "/jamaica-premier-league/startseite/wettbewerb/JPL1"}
+{"type": "competition", "country_name": "Jamaica", "country_code": "JPP1", "competition_type": "first_tier", "href": "/jamaica-premier-league-playoff/startseite/wettbewerb/JPP1"}
+{"type": "competition", "country_name": "Mexico", "country_code": "MEX1", "competition_type": "first_tier", "href": "/liga-mx-clausura/startseite/wettbewerb/MEX1"}
+{"type": "competition", "country_name": "Mexico", "country_code": "MEXA", "competition_type": "first_tier", "href": "/liga-mx-apertura/startseite/wettbewerb/MEXA"}
+{"type": "competition", "country_name": "Mexico", "country_code": "POMX", "competition_type": "first_tier", "href": "/liguilla-apertura/startseite/wettbewerb/POMX"}
+{"type": "competition", "country_name": "Mexico", "country_code": "POME", "competition_type": "first_tier", "href": "/liguilla-clausura/startseite/wettbewerb/POME"}
+{"type": "competition", "country_name": "Mexico", "country_code": "MEX2", "competition_type": "second_tier", "href": "/liga-de-expansion-mx-clausura/startseite/wettbewerb/MEX2"}
+{"type": "competition", "country_name": "Mexico", "country_code": "MEXB", "competition_type": "second_tier", "href": "/liga-de-expansion-mx-apertura/startseite/wettbewerb/MEXB"}
+{"type": "competition", "country_name": "Mexico", "country_code": "MXBA", "competition_type": "second_tier", "href": "/liguilla-de-expansion-apertura/startseite/wettbewerb/MXBA"}
+{"type": "competition", "country_name": "Mexico", "country_code": "MXBC", "competition_type": "second_tier", "href": "/liguilla-de-expansion-clausura/startseite/wettbewerb/MXBC"}
+{"type": "competition", "country_name": "Nicaragua", "country_code": "NC1A", "competition_type": "first_tier", "href": "/liga-primera-de-nicaragua-apertura/startseite/wettbewerb/NC1A"}
+{"type": "competition", "country_name": "Nicaragua", "country_code": "NC1C", "competition_type": "first_tier", "href": "/liga-primera-de-nicaragua-clausura/startseite/wettbewerb/NC1C"}
+{"type": "competition", "country_name": "Panama", "country_code": "PN1C", "competition_type": "first_tier", "href": "/liga-panamena-de-futbol-clausura/startseite/wettbewerb/PN1C"}
+{"type": "competition", "country_name": "Panama", "country_code": "PN1A", "competition_type": "first_tier", "href": "/liga-panamena-de-futbol-apertura/startseite/wettbewerb/PN1A"}
+{"type": "competition", "country_name": "Paraguay", "country_code": "PR1A", "competition_type": "first_tier", "href": "/primera-division-apertura/startseite/wettbewerb/PR1A"}
+{"type": "competition", "country_name": "Paraguay", "country_code": "PR1C", "competition_type": "first_tier", "href": "/primera-division-clausura/startseite/wettbewerb/PR1C"}
+{"type": "competition", "country_name": "Paraguay", "country_code": "PAR2", "competition_type": "second_tier", "href": "/division-intermedia/startseite/wettbewerb/PAR2"}
+{"type": "competition", "country_name": "Peru", "country_code": "TDeA", "competition_type": "first_tier", "href": "/liga-1-apertura/startseite/wettbewerb/TDeA"}
+{"type": "competition", "country_name": "Peru", "country_code": "TDeC", "competition_type": "first_tier", "href": "/liga-1-clausura/startseite/wettbewerb/TDeC"}
+{"type": "competition", "country_name": "Peru", "country_code": "PEDP", "competition_type": "first_tier", "href": "/liga-1-liguilla-a/startseite/wettbewerb/PEDP"}
+{"type": "competition", "country_name": "Peru", "country_code": "PEDI", "competition_type": "first_tier", "href": "/liga-1-liguilla-b/startseite/wettbewerb/PEDI"}
+{"type": "competition", "country_name": "Peru", "country_code": "PERC", "competition_type": "first_tier", "href": "/torneo-descentralizado-2007-2013-/startseite/wettbewerb/PERC"}
+{"type": "competition", "country_name": "Peru", "country_code": "PERS", "competition_type": "first_tier", "href": "/torneo-descentralizado-segunda-fase/startseite/wettbewerb/PERS"}
+{"type": "competition", "country_name": "Peru", "country_code": "Inka", "competition_type": "first_tier", "href": "/torneo-de-verano-2018-/startseite/wettbewerb/Inka"}
+{"type": "competition", "country_name": "Peru", "country_code": "PER2", "competition_type": "second_tier", "href": "/liga-2/startseite/wettbewerb/PER2"}
+{"type": "competition", "country_name": "USA", "country_code": "MLS1", "competition_type": "first_tier", "href": "/major-league-soccer/startseite/wettbewerb/MLS1"}
+{"type": "competition", "country_name": "USA", "country_code": "US1L", "competition_type": "first_tier", "href": "/usl-division-one/startseite/wettbewerb/US1L"}
+{"type": "competition", "country_name": "USA", "country_code": "USL", "competition_type": "second_tier", "href": "/usl-championship/startseite/wettbewerb/USL"}
+{"type": "competition", "country_name": "USA", "country_code": "NAFC", "competition_type": "second_tier", "href": "/nasl-fall-championship-2013-2017-/startseite/wettbewerb/NAFC"}
+{"type": "competition", "country_name": "USA", "country_code": "NASC", "competition_type": "second_tier", "href": "/nasl-spring-championship-2013-2017-/startseite/wettbewerb/NASC"}
+{"type": "competition", "country_name": "USA", "country_code": "USA2", "competition_type": "second_tier", "href": "/north-american-soccer-league-2011-2012-/startseite/wettbewerb/USA2"}
+{"type": "competition", "country_name": "USA", "country_code": "USFD", "competition_type": "second_tier", "href": "/usl-first-division-2005-2009-/startseite/wettbewerb/USFD"}
+{"type": "competition", "country_name": "USA", "country_code": "UD2L", "competition_type": "second_tier", "href": "/ussf-division-2-professional-league-2010-/startseite/wettbewerb/UD2L"}
+{"type": "competition", "country_name": "Uruguay", "country_code": "URU1", "competition_type": "first_tier", "href": "/liga-auf-apertura/startseite/wettbewerb/URU1"}
+{"type": "competition", "country_name": "Uruguay", "country_code": "URUE", "competition_type": "first_tier", "href": "/campeonato-uruguayo-especial/startseite/wettbewerb/URUE"}
+{"type": "competition", "country_name": "Uruguay", "country_code": "URUC", "competition_type": "first_tier", "href": "/liga-auf-clausura/startseite/wettbewerb/URUC"}
+{"type": "competition", "country_name": "Uruguay", "country_code": "URUI", "competition_type": "first_tier", "href": "/liga-auf-intermedio/startseite/wettbewerb/URUI"}
+{"type": "competition", "country_name": "Uruguay", "country_code": "UR2T", "competition_type": "second_tier", "href": "/segunda-division-torneo-competencia/startseite/wettbewerb/UR2T"}
+{"type": "competition", "country_name": "Uruguay", "country_code": "URU2", "competition_type": "second_tier", "href": "/segunda-division-fase-regular/startseite/wettbewerb/URU2"}
+{"type": "competition", "country_name": "Uruguay", "country_code": "URE2", "competition_type": "second_tier", "href": "/segunda-division-profesional-especial-2016-/startseite/wettbewerb/URE2"}
+{"type": "competition", "country_name": "Uruguay", "country_code": "UR2S", "competition_type": "second_tier", "href": "/segunda-division-profesional-segunda-fase/startseite/wettbewerb/UR2S"}
+{"type": "competition", "country_name": "Venezuela", "country_code": "VZ1A", "competition_type": "first_tier", "href": "/liga-futve-apertura/startseite/wettbewerb/VZ1A"}
+{"type": "competition", "country_name": "Venezuela", "country_code": "VZ1L", "competition_type": "first_tier", "href": "/liga-futve/startseite/wettbewerb/VZ1L"}
+{"type": "competition", "country_name": "Venezuela", "country_code": "VZ1C", "competition_type": "first_tier", "href": "/liga-futve-clausura/startseite/wettbewerb/VZ1C"}
+{"type": "competition", "country_name": "Venezuela", "country_code": "VN2A", "competition_type": "second_tier", "href": "/liga-futve-2/startseite/wettbewerb/VN2A"}
+{"type": "competition", "country_name": "Venezuela", "country_code": "VN2C", "competition_type": "second_tier", "href": "/liga-futve-2-segunda-fase/startseite/wettbewerb/VN2C"}

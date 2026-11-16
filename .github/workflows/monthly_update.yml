@@ -13,6 +13,13 @@ on:
           - core
           - big5
           - eastern_europe
+          - europe_other
+          - americas
+          - asia
+          - africa
+          - oceania
+          - continental_cups
+          - national_teams
 
 jobs:
   scrape:

@@ -355,6 +355,60 @@ def patch_club_tiers():
     return True
 
 
+def patch_games_fallback():
+    """Fallback voor games.py wanneer de competitiepagina geen footer-links
+    meer heeft.
+
+    UEFA Champions/Europa/Conference League en de landenploegen-toernooien
+    (WK, EK, Nations League, Copa América, Afrika Cup) hebben een volledig
+    JS-rendered landingspagina (0 <table> elementen, geen footer-links) -
+    parse() vindt daardoor nooit de 'All fixtures & results'-link en
+    retourneert stil niets.
+
+    De eigenlijke wedstrijdenlijst-pagina ('gesamtspielplan') bestaat wel
+    nog als klassieke server-rendered pagina, op een voorspelbare URL:
+    <slug>/gesamtspielplan/pokalwettbewerb/<CODE>/saison_id/<season>
+    (bevestigd door de embedded JSON op de CL/UCOL/FIWC/EURO/COPA/AFCN
+    landingspagina's zelf op te vragen). Als de footer-link niet gevonden
+    wordt, bouwen we die URL rechtstreeks op als fallback.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'games.py'
+    if not fpath.exists():
+        print(f"  games.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    if 'gesamtspielplan/pokalwettbewerb' in src:
+        print("  games.py: fallback bestaat al - overslaan")
+        return True
+
+    old_block = (
+        "        return response.follow(next_url, self.extract_game_urls, cb_kwargs=cb_kwargs)\n"
+    )
+    new_block = (
+        "        return response.follow(next_url, self.extract_game_urls, cb_kwargs=cb_kwargs)\n"
+        "\n"
+        "    # PATCH: nieuwere, volledig JS-rendered competitiepagina's (CL/EL/UCOL,\n"
+        "    # landenploegen-toernooien) hebben geen footer-links meer. De\n"
+        "    # wedstrijdenlijst zelf is nog wel server-rendered - rechtstreeks\n"
+        "    # opbouwen als fallback.\n"
+        "    if 'startseite/wettbewerb' in parent['href']:\n"
+        "      fallback_path = parent['href'].replace(\n"
+        "        'startseite/wettbewerb', 'gesamtspielplan/pokalwettbewerb'\n"
+        "      ) + f'/saison_id/{self.season}'\n"
+        "      return response.follow(fallback_path, self.extract_game_urls, cb_kwargs=cb_kwargs)\n"
+    )
+    if old_block not in src:
+        print("  games.py: anker voor fallback niet gevonden - overslaan")
+        return False
+
+    new_src = src.replace(old_block, new_block, 1)
+    fpath.write_text(new_src)
+    print("  ✅ games.py: fallback voor JS-rendered competitiepagina's toegevoegd")
+    return True
+
+
 def main():
     print("=== Scraper patch script ===")
     print(f"Scraper directory: {SCRAPER_DIR}")
@@ -368,6 +422,7 @@ def main():
     patch_appearances()
     patch_common()
     patch_club_tiers()
+    patch_games_fallback()
     print("=== Patches klaar ===")
 
 
