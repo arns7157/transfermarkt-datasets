@@ -321,12 +321,13 @@ def patch_common():
 
 
 def patch_club_tiers():
-    """Laat de clubs-spider ook second_tier competities verwerken.
+    """Laat de clubs-spider ook second_tier t/m fifth_tier competities verwerken.
 
     start_requests() in common.py slaat van oudsher alles behalve
     'first_tier' over voor de clubs-spider. Daardoor worden clubs/spelers
-    van 2e klasses (BE2, PO2, TR2, A2, C2, NL2, GRS2, ...) nooit ververst -
-    enkel wedstrijden (games-spider), want die heeft deze beperking niet.
+    van lagere klasses (BE2, PO2, TR2, A2, C2, NL2, GRS2, GB3/GB4/CNAT,
+    L3, E3G1/E3G2, IT3A-C, FR3, NTD, ...) nooit ververst - enkel
+    wedstrijden (games-spider), want die heeft deze beperking niet.
     Playoff-competities blijven overgeslagen: die pagina's hebben geen
     spelerslijst-tabel, dus clubs.py's assert(len(with_teams_info) == 1)
     zou daar toch altijd falen.
@@ -339,7 +340,10 @@ def patch_club_tiers():
     src = fpath.read_text()
 
     old_check = "if self.name == 'clubs' and item['competition_type'] != 'first_tier':"
-    new_check = "if self.name == 'clubs' and item['competition_type'] not in ('first_tier', 'second_tier'):"
+    new_check = (
+        "if self.name == 'clubs' and item['competition_type'] not in "
+        "('first_tier', 'second_tier', 'third_tier', 'fourth_tier', 'fifth_tier'):"
+    )
 
     if new_check in src:
         print("  common.py: second_tier-patch bestaat al - overslaan")
@@ -351,7 +355,7 @@ def patch_club_tiers():
 
     new_src = src.replace(old_check, new_check, 1)
     fpath.write_text(new_src)
-    print("  ✅ common.py: clubs-spider verwerkt nu ook second_tier competities")
+    print("  ✅ common.py: clubs-spider verwerkt nu ook second_tier t/m fifth_tier competities")
     return True
 
 

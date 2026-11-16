@@ -6,3 +6,4 @@
 {"type": "competition", "country_name": "Europe", "country_code": "EUR", "competition_type": "national_team", "href": "/uefa-nations-league-d/startseite/wettbewerb/UNLD"}
 {"type": "competition", "country_name": "South America", "country_code": "SAM", "competition_type": "national_team", "href": "/copa-america/startseite/wettbewerb/COPA"}
 {"type": "competition", "country_name": "Africa", "country_code": "AFR", "competition_type": "national_team", "href": "/africa-cup-of-nations/startseite/wettbewerb/AFCN"}
+{"type": "competition", "country_name": "International", "country_code": "FIFA", "competition_type": "national_team", "href": "/international-friendlies/startseite/pokalwettbewerb/FS"}
