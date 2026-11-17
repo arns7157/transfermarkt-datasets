@@ -126,7 +126,8 @@ display = filtered[
     }
 )
 
-st.dataframe(
+st.caption("Klik op een rij om naar het spelerprofiel te gaan.")
+event = st.dataframe(
     display,
     width="stretch",
     hide_index=True,
@@ -139,4 +140,12 @@ st.dataframe(
         "Marktwaarde (M€)": st.column_config.NumberColumn(format="%.1f"),
         "Contract tot": st.column_config.DateColumn(format="DD/MM/YYYY"),
     },
+    on_select="rerun",
+    selection_mode="single-row",
 )
+
+selected_rows = event.selection.get("rows", []) if event and event.selection else []
+if selected_rows:
+    clicked_player_id = filtered.iloc[selected_rows[0]]["player_id"]
+    st.session_state["jump_to_player_id"] = clicked_player_id
+    st.switch_page("pages/3_Spelerprofiel.py")

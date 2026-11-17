@@ -13,7 +13,7 @@ transfers = load_transfers()
 n_competities = players["current_club_domestic_competition_id"].nunique()
 
 competition_logos = (
-    players.dropna(subset=["competition_logo_url"])
+    players[players["competition_logo_url"].fillna("") != ""]
     .drop_duplicates("current_club_domestic_competition_id")
     .sort_values("current_club_domestic_competition_id")["competition_logo_url"]
     .tolist()

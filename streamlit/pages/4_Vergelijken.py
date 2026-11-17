@@ -12,6 +12,8 @@ from utils import (
     load_valuations,
     player_label,
     render_header,
+    safe_val,
+    style_dark_chart,
 )
 
 st.set_page_config(page_title="Spelers vergelijken", page_icon="⚖️", layout="wide")
@@ -44,7 +46,7 @@ for col, (_, p) in zip(header_cols, selected_players.iterrows()):
             st.image(p["image_url"], width=110)
         club_crest = inline_img(p.get("club_crest_url"))
         st.markdown(
-            f"**{p['name']}**  \n{club_crest}{p.get('current_club_name', '–')}",
+            f"**{p['name']}**  \n{club_crest}{safe_val(p.get('current_club_name'))}",
             unsafe_allow_html=True,
         )
 
@@ -54,9 +56,9 @@ for _, p in selected_players.iterrows():
     rows.append(
         {
             "Speler": p["name"],
-            "Club": p.get("current_club_name", "–"),
-            "Leeftijd": p.get("age", "–"),
-            "Positie": p.get("position", "–"),
+            "Club": safe_val(p.get("current_club_name")),
+            "Leeftijd": safe_val(p.get("age")),
+            "Positie": safe_val(p.get("position")),
             "Marktwaarde": format_money(p.get("market_value_in_eur")),
             "Wedstrijden (seizoen)": len(apps),
             "Goals (seizoen)": int(apps["goals"].sum()),
@@ -84,5 +86,5 @@ else:
         labels={"date": "Datum", "market_value_in_eur": "Marktwaarde (€)"},
         color_discrete_sequence=["#22C55E", "#3B82F6", "#F59E0B", "#EF4444"],
     )
-    fig.update_layout(plot_bgcolor="#0B0F14", paper_bgcolor="#0B0F14", font_color="#E5E7EB")
+    style_dark_chart(fig)
     st.plotly_chart(fig, width="stretch")

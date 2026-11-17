@@ -171,6 +171,24 @@ def position_badge(position: str) -> str:
     )
 
 
+def safe_val(value, default="–"):
+    """row.get(key, default) only falls back when the KEY is missing - a
+    present-but-NaN/pd.NA cell (common for nullable Int64 columns like age,
+    or float columns like height_in_cm) sails straight through and renders
+    as the literal text "nan"/"<NA>" - worse, inside unsafe_allow_html
+    markdown, "<NA>" is swallowed as an (unknown) HTML tag and the value
+    just vanishes. Use this instead of a bare .get(key, default) for any
+    value that gets rendered to the page."""
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
 def inline_img(url, height: int = 18) -> str:
     """Small inline <img> tag for use inside st.markdown(unsafe_allow_html=True),
     e.g. next to a club/competition/country name. Returns '' for a missing URL
@@ -178,6 +196,26 @@ def inline_img(url, height: int = 18) -> str:
     if not isinstance(url, str) or not url:
         return ""
     return f'<img src="{url}" height="{height}" style="vertical-align:middle;border-radius:3px;margin-right:4px;">'
+
+
+def style_dark_chart(fig, **extra_layout):
+    """Apply a complete, self-consistent dark style to a Plotly figure.
+
+    Setting only plot_bgcolor/paper_bgcolor/font_color leaves sub-elements
+    Plotly doesn't inherit that from (hover tooltips, legend swatches) on
+    their light-theme defaults - black text on a near-black background.
+    template='plotly_dark' covers those too; extra_layout can still
+    override/add anything (e.g. a custom legend position).
+    """
+    fig.update_layout(
+        template="plotly_dark",
+        plot_bgcolor="#0B0F14",
+        paper_bgcolor="#0B0F14",
+        font_color="#E5E7EB",
+        hoverlabel=dict(bgcolor="#151B23", font_color="#E5E7EB"),
+        **extra_layout,
+    )
+    return fig
 
 
 def inject_theme() -> None:

@@ -15,6 +15,8 @@ from utils import (
     player_label,
     position_badge,
     render_header,
+    safe_val,
+    style_dark_chart,
 )
 
 st.set_page_config(page_title="Spelerprofiel", page_icon="📊", layout="wide")
@@ -28,6 +30,10 @@ valuations = load_valuations()
 
 labels = {pid: player_label(row) for pid, row in zip(players["player_id"], players.to_dict("records"))}
 
+# Komt de gebruiker hier binnen via een klik op een rij in "Spelers zoeken"?
+# Dan die speler meteen selecteren i.p.v. een lege zoekopdracht te tonen.
+jump_to_player_id = st.session_state.pop("jump_to_player_id", None)
+
 search = st.text_input("Zoek speler op naam")
 candidates = players
 if search:
@@ -37,9 +43,15 @@ if candidates.empty:
     st.info("Geen speler gevonden.")
     st.stop()
 
+candidate_ids = candidates["player_id"].tolist()
+default_index = 0
+if jump_to_player_id is not None and jump_to_player_id in candidate_ids:
+    default_index = candidate_ids.index(jump_to_player_id)
+
 selected_id = st.selectbox(
     "Speler",
-    candidates["player_id"].tolist(),
+    candidate_ids,
+    index=default_index,
     format_func=lambda pid: labels.get(pid, str(pid)),
 )
 player = players[players["player_id"] == selected_id].iloc[0]
@@ -58,11 +70,11 @@ with col_info:
     club_crest = inline_img(player.get("club_crest_url"))
     comp_logo = inline_img(player.get("competition_logo_url"))
     st.markdown(
-        f"**Leeftijd:** {player.get('age', '–')} &nbsp;·&nbsp; "
-        f"**Voet:** {player.get('foot', '–')} &nbsp;·&nbsp; "
-        f"**Lengte:** {player.get('height_in_cm', '–')} cm  \n"
-        f"**Nationaliteit:** {nat_flag}{player.get('country_of_citizenship', '–')}  \n"
-        f"**Huidige club:** {club_crest}{player.get('current_club_name', '–')} "
+        f"**Leeftijd:** {safe_val(player.get('age'))} &nbsp;·&nbsp; "
+        f"**Voet:** {safe_val(player.get('foot'))} &nbsp;·&nbsp; "
+        f"**Lengte:** {safe_val(player.get('height_in_cm'))} cm  \n"
+        f"**Nationaliteit:** {nat_flag}{safe_val(player.get('country_of_citizenship'))}  \n"
+        f"**Huidige club:** {club_crest}{safe_val(player.get('current_club_name'))} "
         f"{comp_logo}  \n"
         f"**Contract tot:** {contract_str}",
         unsafe_allow_html=True,
@@ -86,7 +98,7 @@ else:
         labels={"date": "Datum", "market_value_in_eur": "Marktwaarde (€)"},
     )
     fig.update_traces(line_color="#22C55E", marker_color="#22C55E")
-    fig.update_layout(plot_bgcolor="#0B0F14", paper_bgcolor="#0B0F14", font_color="#E5E7EB")
+    style_dark_chart(fig)
     st.plotly_chart(fig, width="stretch")
 
 st.divider()
@@ -120,12 +132,7 @@ else:
         mode="markers+lines",
         marker_color="#EF4444",
     )
-    fig.update_layout(
-        plot_bgcolor="#0B0F14",
-        paper_bgcolor="#0B0F14",
-        font_color="#E5E7EB",
-        legend=dict(orientation="h", y=1.1),
-    )
+    style_dark_chart(fig, legend=dict(orientation="h", y=1.1))
     st.plotly_chart(fig, width="stretch")
 
     st.subheader("Recente wedstrijden")
