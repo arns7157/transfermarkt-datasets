@@ -641,8 +641,23 @@ jobs:
           players = load_jsonl(RAW / 'players.json')
           new_player_rows = []
           for p in players:
-              club_href = p.get('parent', {}).get('href', '')
-              club_info = club_lookup.get(club_href, {})
+              # PATCH: gebruik de EIGEN 'current_club' van de speler (van zijn
+              # profielpagina) i.p.v. 'parent' (de club waar we hem toevallig
+              # onder gevonden hebben via de squad-lijst). Een speler die naar
+              # een niet-gescrapede competitie is vertrokken bleef anders voor
+              # altijd bij zijn oude club/competitie "vastgevroren" staan.
+              # club_id_map (hierboven opgebouwd, bevat zowel oude als nieuw
+              # gescrapede clubs) geeft de beste kans op een juiste naam en
+              # competitie_id, ook als die club deze run niet zelf gescraped is.
+              own_current_club = p.get('current_club') or {}
+              club_href = own_current_club.get('href', '') or p.get('parent', {}).get('href', '')
+              current_club_id = extract_id(club_href)
+              club_record = club_id_map.get(str(current_club_id), {}) if current_club_id else {}
+              club_info = {
+                  'club_id': current_club_id,
+                  'name': club_record.get('name', '') or own_current_club.get('name', ''),
+                  'competition_id': club_record.get('domestic_competition_id', ''),
+              }
               player_id = p.get('id') or extract_id(p.get('href', ''))
               height_raw = p.get('height', '') or ''
               try: height_cm = int(float(height_raw.replace('m','').replace(',','.').strip()) * 100)

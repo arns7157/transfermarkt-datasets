@@ -262,6 +262,58 @@ def patch_player_names():
     return True
 
 
+def patch_current_club_name():
+    """Haalt ook de NAAM van de huidige club op, niet enkel de href.
+
+    Gevonden tijdens een datacontrole: de merge gebruikte voorheen de club
+    waar een speler toevallig onder gevonden werd (via de squad-lijst) i.p.v.
+    zijn eigen 'Current club'-veld op zijn profielpagina. Een speler die naar
+    een niet-gescrapede competitie vertrok (bv. naar de Bundesliga terwijl
+    enkel 'core' draait) bleef daardoor voor altijd bij zijn oude club/
+    competitie "vastgevroren" staan in players.csv (zie Antonio Nusa:
+    transfers/marktwaarde/optredens klopten, current_club niet).
+
+    De href zat er al, maar de bijhorende naam niet: het "Current club:"-
+    blok bevat TWEE <a>-tags (eerste wrapt enkel het clublogo, geen tekst;
+    tweede heeft de clubnaam als tekst) - alle tekstnodes ophalen en de
+    eerste niet-lege nemen geeft betrouwbaar de naam.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'players.py'
+    if not fpath.exists():
+        print(f"  players.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    old_block = (
+        "    attributes['current_club'] = {\n"
+        "      'href': response.xpath(\"//span[contains(text(),'Current club:')]/following::span[1]/a/@href\").get()\n"
+        "    }\n"
+    )
+    new_block = (
+        "    current_club_texts = response.xpath(\n"
+        "      \"//span[contains(text(),'Current club:')]/following::span[1]/a/text()\"\n"
+        "    ).getall()\n"
+        "    current_club_name = next((t.strip() for t in current_club_texts if t.strip()), None)\n"
+        "    attributes['current_club'] = {\n"
+        "      'href': response.xpath(\"//span[contains(text(),'Current club:')]/following::span[1]/a/@href\").get(),\n"
+        "      'name': current_club_name,\n"
+        "    }\n"
+    )
+
+    if "'name': current_club_name" in src:
+        print("  players.py: current_club naam-extractie bestaat al - overslaan")
+        return True
+    if old_block not in src:
+        print("  players.py: current_club-blok niet gevonden - overslaan")
+        return False
+
+    src = src.replace(old_block, new_block, 1)
+    fpath.write_text(src)
+    print("  ✅ players.py: current_club bevat nu ook de naam")
+    return True
+
+
 def patch_appearances():
     """Fix appearances.py waar full_stats_href None kan zijn.
 
@@ -473,6 +525,7 @@ def main():
     patch_clubs()
     patch_club_market_value()
     patch_player_names()
+    patch_current_club_name()
     patch_appearances()
     patch_common()
     patch_club_tiers()
