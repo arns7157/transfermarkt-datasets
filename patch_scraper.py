@@ -24,7 +24,7 @@ def patch_players():
         print(f"  players.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     # Zoek de originele parse() method en vervang hem
     new_parse = '''  def parse(self, response, parent):
@@ -80,7 +80,7 @@ def patch_players():
         return False
 
     new_src = pattern.sub(lambda m: new_parse, src, count=1)
-    fpath.write_text(new_src)
+    fpath.write_text(new_src, encoding='utf-8')
     print("  ✅ players.py: parse() vervangen door robuuste versie")
     return True
 
@@ -100,7 +100,7 @@ def patch_clubs():
         print(f"  clubs.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     if 'extract_team_name' in src:
         print("  clubs.py: naam-extractie bestaat al - overslaan")
@@ -151,7 +151,7 @@ def patch_clubs():
         return False
     src = src.replace(old_cb, new_cb, 1)
 
-    fpath.write_text(src)
+    fpath.write_text(src, encoding='utf-8')
     print("  ✅ clubs.py: club-naam extractie toegevoegd")
     return True
 
@@ -179,7 +179,7 @@ def patch_club_market_value():
         print(f"  clubs.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     old_line = "    attributes['total_market_value'] = response.css('div.dataMarktwert a::text').get()"
     new_line = (
@@ -200,7 +200,7 @@ def patch_club_market_value():
         return False
 
     src = src.replace(old_line, new_line, 1)
-    fpath.write_text(src)
+    fpath.write_text(src, encoding='utf-8')
     print("  ✅ clubs.py: total_market_value-selector bijgewerkt")
     return True
 
@@ -220,7 +220,7 @@ def patch_club_images():
         print(f"  clubs.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     if "attributes['crest_url']" in src:
         print("  clubs.py: logo/vlag-extractie bestaat al - overslaan")
@@ -254,7 +254,7 @@ def patch_club_images():
         "    ).get()\n"
     )
     src = src.replace(marker, addition, 1)
-    fpath.write_text(src)
+    fpath.write_text(src, encoding='utf-8')
     print("  ✅ clubs.py: crest_url, competition_logo_url en country_flag_url toegevoegd")
     return True
 
@@ -281,7 +281,7 @@ def patch_player_names():
         print(f"  players.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     if "attributes['last_name']" in src:
         print("  players.py: naam-extractie bestaat al - overslaan")
@@ -311,7 +311,7 @@ def patch_player_names():
         "    attributes['name_in_home_country']"
     )
     src = src.replace(marker, name_block, 1)
-    fpath.write_text(src)
+    fpath.write_text(src, encoding='utf-8')
     print("  ✅ players.py: voornaam/achternaam extractie toegevoegd")
     return True
 
@@ -337,7 +337,7 @@ def patch_current_club_name():
         print(f"  players.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     old_block = (
         "    attributes['current_club'] = {\n"
@@ -363,7 +363,7 @@ def patch_current_club_name():
         return False
 
     src = src.replace(old_block, new_block, 1)
-    fpath.write_text(src)
+    fpath.write_text(src, encoding='utf-8')
     print("  ✅ players.py: current_club bevat nu ook de naam")
     return True
 
@@ -383,7 +383,7 @@ def patch_player_flags():
         print(f"  players.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     if "citizenship_flag_url" in src:
         print("  players.py: vlag-URL extractie bestaat al - overslaan")
@@ -417,8 +417,69 @@ def patch_player_flags():
         return False
     src = src.replace(old_citizenship, new_citizenship, 1)
 
-    fpath.write_text(src)
+    fpath.write_text(src, encoding='utf-8')
     print("  ✅ players.py: citizenship_flag_url en place_of_birth.flag_url toegevoegd")
+    return True
+
+
+def patch_player_birthdate_age():
+    """Fix date_of_birth/age in players.py: Transfermarkt heeft de losse
+    'Date of birth:' en 'Age:' labels samengevoegd tot één label
+    'Date of birth/Age:' (bv. "28/06/1991 (35)"). De oude exacte-tekst
+    xpaths ("//span[text()='Date of birth:']" / "//span[text()='Age:']")
+    matchen daardoor nergens meer op de pagina en geven altijd None - elke
+    speler die herscraped wordt verliest zo zijn geboortedatum EN leeftijd
+    (bevestigd live: Erling Haaland, Anton Stach, ... stonden na de laatste
+    big5-run allebei leeg).
+
+    Fix: de waarde staat intact in een stabiel microdata-attribuut,
+    <span itemprop="birthDate">28/06/1991 (35)</span> - datum en leeftijd
+    daar met een regex uit halen i.p.v. op het (nu dubbelzinnige) label te
+    zoeken.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'players.py'
+    if not fpath.exists():
+        print(f"  players.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text(encoding='utf-8')
+
+    if "itemprop='birthDate'" in src:
+        print("  players.py: geboortedatum/leeftijd-fix bestaat al - overslaan")
+        return True
+
+    old_block = (
+        "    attributes['name_in_home_country'] = response.xpath(\"//span[text()='Name in home country:']/following::span[1]/text()\").get()\n"
+        "    attributes['date_of_birth'] = response.xpath(\"//span[text()='Date of birth:']/following::span[1]//text()\").get()\n"
+    )
+    new_block = (
+        "    attributes['name_in_home_country'] = response.xpath(\"//span[text()='Name in home country:']/following::span[1]/text()\").get()\n"
+        "\n"
+        "    # PATCH: 'Date of birth:' en 'Age:' zijn samengevoegd tot één label op\n"
+        "    # TM - de waarde zelf staat nog intact in dit microdata-attribuut.\n"
+        "    birth_date_age_text = self.safe_strip(\n"
+        "      response.xpath(\"//span[@itemprop='birthDate']/text()\").get()\n"
+        "    ) or ''\n"
+        "    dob_match = re.search(r'(\\d{1,2}/\\d{1,2}/\\d{4})', birth_date_age_text)\n"
+        "    age_match = re.search(r'\\((\\d+)\\)', birth_date_age_text)\n"
+        "    attributes['date_of_birth'] = dob_match.group(1) if dob_match else None\n"
+        "    attributes['age'] = age_match.group(1) if age_match else None\n"
+    )
+
+    if old_block not in src:
+        print("  players.py: anker voor geboortedatum-fix niet gevonden - overslaan")
+        return False
+    src = src.replace(old_block, new_block, 1)
+
+    old_age_line = "    attributes['age'] = response.xpath(\"//span[text()='Age:']/following::span[1]/text()\").get()\n"
+    if old_age_line in src:
+        src = src.replace(old_age_line, "", 1)
+    elif "attributes['age'] = age_match" not in src:
+        print("  players.py: oude age-regel niet gevonden (versie-mismatch?) - overslaan")
+        return False
+
+    fpath.write_text(src, encoding='utf-8')
+    print("  ✅ players.py: date_of_birth/age-extractie hersteld (itemprop='birthDate')")
     return True
 
 
@@ -439,7 +500,7 @@ def patch_appearances():
         print("  appearances.py niet gevonden - overslaan")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     # Vind de crashende regel en behoud de bestaande indentatie
     # Regex: optionele whitespace + "seasoned_full_stats_href = full_stats_href..."
@@ -490,7 +551,7 @@ def patch_appearances():
         else:
             print("  ⚠ appearances.py: oude CSS-selector niet gevonden (al bijgewerkt?)")
 
-    fpath.write_text(new_src)
+    fpath.write_text(new_src, encoding='utf-8')
     print(f"  ✅ appearances.py: None-guard + fallback toegevoegd (indent={len(indent)} chars)")
     return True
 
@@ -507,7 +568,7 @@ def patch_common():
         print(f"  common.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     if 'async def start(self)' in src:
         print("  common.py: start() bridge bestaat al - overslaan")
@@ -524,7 +585,7 @@ def patch_common():
         '      yield request\n\n'
     )
     new_src = src.replace(marker, bridge + marker, 1)
-    fpath.write_text(new_src)
+    fpath.write_text(new_src, encoding='utf-8')
     print("  ✅ common.py: start() bridge naar start_requests() toegevoegd")
     return True
 
@@ -546,7 +607,7 @@ def patch_club_tiers():
         print(f"  common.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     old_check = "if self.name == 'clubs' and item['competition_type'] != 'first_tier':"
     new_check = (
@@ -563,7 +624,7 @@ def patch_club_tiers():
         return False
 
     new_src = src.replace(old_check, new_check, 1)
-    fpath.write_text(new_src)
+    fpath.write_text(new_src, encoding='utf-8')
     print("  ✅ common.py: clubs-spider verwerkt nu ook second_tier t/m fifth_tier competities")
     return True
 
@@ -590,7 +651,7 @@ def patch_games_fallback():
         print(f"  games.py niet gevonden op {fpath}")
         return False
 
-    src = fpath.read_text()
+    src = fpath.read_text(encoding='utf-8')
 
     if 'gesamtspielplan/pokalwettbewerb' in src:
         print("  games.py: fallback bestaat al - overslaan")
@@ -617,7 +678,7 @@ def patch_games_fallback():
         return False
 
     new_src = src.replace(old_block, new_block, 1)
-    fpath.write_text(new_src)
+    fpath.write_text(new_src, encoding='utf-8')
     print("  ✅ games.py: fallback voor JS-rendered competitiepagina's toegevoegd")
     return True
 
@@ -636,6 +697,7 @@ def main():
     patch_player_names()
     patch_current_club_name()
     patch_player_flags()
+    patch_player_birthdate_age()
     patch_appearances()
     patch_common()
     patch_club_tiers()

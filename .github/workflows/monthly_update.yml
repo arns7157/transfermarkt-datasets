@@ -537,7 +537,7 @@ jobs:
       - name: Stap 5 - JSON naar CSV omzetten en samenvoegen
         run: |
           python3 << 'PYEOF'
-          import json, csv
+          import json, csv, re
           from pathlib import Path
           RAW = Path('data/raw')
           OUT = Path('data/csv')
@@ -701,8 +701,15 @@ jobs:
               }
               player_id = p.get('id') or extract_id(p.get('href', ''))
               height_raw = p.get('height', '') or ''
-              try: height_cm = int(float(height_raw.replace('m','').replace(',','.').strip()) * 100)
-              except: height_cm = ''
+              # PATCH: transfermarkt.co.uk toont lengte nu soms als "5 ft 11 in"
+              # i.p.v. het oude metrische "1,85m" - probeer dat formaat eerst.
+              ft_in_match = re.match(r'\s*(\d+)\s*ft\s*(\d+)\s*in', height_raw)
+              if ft_in_match:
+                  feet, inches = int(ft_in_match.group(1)), int(ft_in_match.group(2))
+                  height_cm = round(feet * 30.48 + inches * 2.54)
+              else:
+                  try: height_cm = int(float(height_raw.replace('m','').replace(',','.').strip()) * 100)
+                  except: height_cm = ''
               pos = p.get('position', '') or ''
               pos_map = {
                   'goalkeeper': 'Goalkeeper',
@@ -770,6 +777,13 @@ jobs:
                       for name_col in ['name', 'first_name', 'last_name', 'current_club_name']:
                           if not r.get(name_col) and old_row.get(name_col):
                               r[name_col] = old_row[name_col]
+                      # Bewaar geboortedatum/leeftijd/lengte als de nieuwe scrape
+                      # ze niet kon vinden (bv. door een label-wijziging op TM) -
+                      # anders verliest een al-bekende speler deze data bij elke
+                      # herscrape i.p.v. gewoon niets bij te leren.
+                      for bio_col in ['date_of_birth', 'age', 'height_in_cm']:
+                          if not r.get(bio_col) and old_row.get(bio_col):
+                              r[bio_col] = old_row[bio_col]
                   player_id_map[pid] = r
           merged_players = list(player_id_map.values())
           if merged_players:
