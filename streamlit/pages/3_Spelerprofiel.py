@@ -5,7 +5,7 @@ import streamlit as st
 
 from utils import (
     club_crest_by_name,
-    competition_logo_map,
+    competition_logo_url,
     current_season_appearances,
     format_money,
     inject_theme,
@@ -155,8 +155,7 @@ else:
         .reset_index()
         .rename(columns={"competition_id": "Competitie"})
     )
-    comp_logos = competition_logo_map()
-    summary.insert(0, "Logo", summary["Competitie"].map(comp_logos).fillna(""))
+    summary.insert(0, "Logo", summary["Competitie"].map(competition_logo_url))
     st.dataframe(
         summary,
         width="stretch",
@@ -180,7 +179,7 @@ else:
     recent = all_player_apps.sort_values("date", ascending=False).head(10)[
         ["date", "competition_id", "goals", "assists", "minutes_played", "yellow_cards", "red_cards"]
     ].copy()
-    recent.insert(1, "Logo", recent["competition_id"].map(competition_logo_map()).fillna(""))
+    recent.insert(1, "Logo", recent["competition_id"].map(competition_logo_url))
     recent.columns = ["Datum", "Logo", "Competitie", "Goals", "Assists", "Minuten", "Geel", "Rood"]
     st.dataframe(
         recent,
@@ -200,10 +199,17 @@ if player_transfers.empty:
 else:
     crest_by_name = club_crest_by_name()
     tdisp = player_transfers[
-        ["transfer_date", "from_club_name", "to_club_name", "transfer_fee", "market_value_at_transfer"]
+        ["transfer_date", "from_club_name", "to_club_name", "from_club_crest_url", "to_club_crest_url", "transfer_fee", "market_value_at_transfer"]
     ].copy()
-    tdisp["from_crest"] = tdisp["from_club_name"].map(crest_by_name).fillna("")
-    tdisp["to_crest"] = tdisp["to_club_name"].map(crest_by_name).fillna("")
+    # De transferHistory-API geeft het logo rechtstreeks mee (betrouwbaar,
+    # ook voor jeugdteams/obscure clubs) - enkel voor rijen die dat nog
+    # niet hebben (van vóór deze fix) valt dit terug op naam-matching.
+    tdisp["from_crest"] = tdisp["from_club_crest_url"].where(
+        tdisp["from_club_crest_url"] != "", tdisp["from_club_name"].map(crest_by_name)
+    ).fillna("")
+    tdisp["to_crest"] = tdisp["to_club_crest_url"].where(
+        tdisp["to_club_crest_url"] != "", tdisp["to_club_name"].map(crest_by_name)
+    ).fillna("")
     tdisp = tdisp[
         ["transfer_date", "from_crest", "from_club_name", "to_crest", "to_club_name", "transfer_fee", "market_value_at_transfer"]
     ]

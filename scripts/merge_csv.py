@@ -444,6 +444,25 @@ def merge():
         if isinstance(v, dict):
             return v.get('clubName', '') or ''
         return v or ''
+    def club_crest(v):
+        # PATCH: de transferHistory-API geeft het clublogo rechtstreeks mee
+        # (clubEmblem-1x/-2x) - betrouwbaarder dan matchen op clubnaam
+        # (transfers.csv gebruikt afgekorte namen als "Man City"/"Dortmund"
+        # die niet overeenkomen met clubs.csv's volledige namen).
+        if isinstance(v, dict):
+            return v.get('clubEmblem-1x', '') or v.get('clubEmblem', '') or ''
+        return ''
+    def club_country_flag(v):
+        if isinstance(v, dict):
+            return v.get('countryFlag', '') or ''
+        return ''
+    def club_href_id(v):
+        if isinstance(v, dict):
+            href = v.get('href', '') or ''
+            parts = href.rstrip('/').split('/')
+            if 'verein' in parts:
+                return parts[parts.index('verein') + 1]
+        return ''
     # ── TRANSFERS ──
     # Laad transfers: probeer transfers_raw.json (scraper) en transfers.json (bestaand)
     raw_transfers = load_jsonl(RAW / 'transfers_raw.json')
@@ -453,14 +472,21 @@ def merge():
     new_transfer_rows = []
     for t in transfers_raw:
         player_id = str(t.get('player_id', ''))
+        from_obj = t.get('from_club_name') or t.get('from') or t.get('fromClubName')
+        to_obj = t.get('to_club_name') or t.get('to') or t.get('toClubName')
         # dcaribou formaat: transfer_date, from_club_name, to_club_name, transfer_fee, market_value_in_eur
         # scraper formaat: date/transferDate, from/fromClubName, to/toClubName, fee, mv
         new_transfer_rows.append({
             'player_id':                player_id,
             'transfer_date':            t.get('transfer_date', '') or t.get('date', '') or t.get('transferDate', ''),
             'transfer_season':          t.get('transfer_season', '') or t.get('season', ''),
-            'from_club_name':           club_name(t.get('from_club_name') or t.get('from') or t.get('fromClubName')),
-            'to_club_name':             club_name(t.get('to_club_name') or t.get('to') or t.get('toClubName')),
+            'from_club_name':           club_name(from_obj),
+            'to_club_name':             club_name(to_obj),
+            'from_club_id':             club_href_id(from_obj),
+            'to_club_id':               club_href_id(to_obj),
+            'from_club_crest_url':      club_crest(from_obj),
+            'to_club_crest_url':        club_crest(to_obj),
+            'to_country_flag_url':      club_country_flag(to_obj),
             'transfer_fee':             _fix_encoding(t.get('transfer_fee', '') or t.get('fee', '') or t.get('transferFee', '')),
             'market_value_at_transfer': _fix_encoding(t.get('market_value_in_eur', '') or t.get('mv', '') or t.get('marketValue', '')),
         })
@@ -468,12 +494,26 @@ def merge():
     transfer_key = lambda r: f"{r.get('player_id','')}_{r.get('transfer_date','')}_{r.get('to_club_name','')}"
     transfer_map = {transfer_key(r): r for r in existing_transfers}
     for r in new_transfer_rows:
-        transfer_map[transfer_key(r)] = r
+        key = transfer_key(r)
+        old_row = transfer_map.get(key)
+        if old_row:
+            for keep_col in ['from_club_id', 'to_club_id', 'from_club_crest_url', 'to_club_crest_url', 'to_country_flag_url']:
+                if not r.get(keep_col) and old_row.get(keep_col):
+                    r[keep_col] = old_row[keep_col]
+        transfer_map[key] = r
     merged_transfers = list(transfer_map.values())
     if merged_transfers:
+        transfer_cols = [
+            'player_id', 'transfer_date', 'transfer_season',
+            'from_club_name', 'to_club_name', 'from_club_id', 'to_club_id',
+            'from_club_crest_url', 'to_club_crest_url', 'to_country_flag_url',
+            'transfer_fee', 'market_value_at_transfer',
+        ]
         with open(OUT / 'transfers.csv', 'w', newline='', encoding='utf-8') as f:
-            w = csv.DictWriter(f, fieldnames=list(merged_transfers[0].keys()))
-            w.writeheader(); w.writerows(merged_transfers)
+            w = csv.DictWriter(f, fieldnames=transfer_cols, extrasaction='ignore')
+            w.writeheader()
+            for row in merged_transfers:
+                w.writerow({k: row.get(k, '') for k in transfer_cols})
         print(f'transfers.csv: {len(merged_transfers)} rijen (was {len(existing_transfers)}, +{len(merged_transfers)-len(existing_transfers)} nieuw)')
     # ── VALUATIONS ──
     valuations_raw = load_jsonl(RAW / 'valuations.json')

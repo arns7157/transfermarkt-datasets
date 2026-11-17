@@ -48,11 +48,27 @@ def load_competitions() -> pd.DataFrame:
     return _read_csv("competitions")
 
 
+def competition_logo_url(competition_id) -> str:
+    """Competition logo, built directly from Transfermarkt's own CDN path
+    convention - confirmed live for every tracked competition_id,
+    including ones with no clubs of their own (Champions League, Europa
+    League, Conference League, World Cup, Euro, Nations League, Copa
+    America, AFCON, ...) where clubs.csv has nothing to derive it from.
+    A made-up/nonexistent code 404s cleanly rather than returning a
+    generic placeholder, so this is safe to apply universally."""
+    if competition_id is None or (isinstance(competition_id, float) and pd.isna(competition_id)):
+        return ""
+    cid = str(competition_id).strip()
+    if not cid or cid.lower() == "nan":
+        return ""
+    return f"https://img.a.transfermarkt.technology/logo/homepageWappen150x150/{cid.lower()}.png"
+
+
 def _competition_image_fallbacks() -> tuple[dict, dict]:
     """competition_id -> logo_url / flag_url, from the bundled reference
-    table. Only used to fill gaps for competitions whose own clubs haven't
-    been (re-)scraped with the crest/logo/flag fields yet, or that have no
-    scraped clubs at all (international cups, national teams)."""
+    table. flag_url has no CDN-path equivalent (no single "country" for a
+    competition like the World Cup), so this stays the fallback for flags;
+    logo_url is kept only for callers that still want the dict form."""
     competitions = load_competitions()
     logo_map = competitions.dropna(subset=["logo_url"]).set_index("competition_id")["logo_url"].to_dict()
     flag_map = competitions.dropna(subset=["flag_url"]).set_index("competition_id")["flag_url"].to_dict()
@@ -73,7 +89,7 @@ def _enrich_with_club_images(players: pd.DataFrame, clubs: pd.DataFrame) -> pd.D
     def club_fallback(col: str) -> pd.Series:
         return clubs_by_id.dropna(subset=[col]).drop_duplicates("club_id").set_index("club_id")[col]
 
-    comp_logo_fallback, comp_flag_fallback = _competition_image_fallbacks()
+    _, comp_flag_fallback = _competition_image_fallbacks()
     comp_id = players.get("current_club_domestic_competition_id")
 
     players["club_crest_url"] = players.get("current_club_crest_url").fillna(
@@ -82,7 +98,7 @@ def _enrich_with_club_images(players: pd.DataFrame, clubs: pd.DataFrame) -> pd.D
     players["competition_logo_url"] = (
         players.get("current_club_competition_logo_url")
         .fillna(cur_id.map(club_fallback("competition_logo_url")))
-        .fillna(comp_id.map(comp_logo_fallback))
+        .fillna(comp_id.map(competition_logo_url))
     )
     players["country_flag_url"] = (
         players.get("current_club_country_flag_url")
@@ -95,25 +111,6 @@ def _enrich_with_club_images(players: pd.DataFrame, clubs: pd.DataFrame) -> pd.D
     for col in ("club_crest_url", "competition_logo_url", "country_flag_url", "citizenship_flag_url"):
         players[col] = players[col].fillna("")
     return players
-
-
-@st.cache_data(ttl=3600)
-def competition_logo_map() -> dict:
-    """Best-effort competition_id -> logo_url, for places that only have a
-    bare competition_id to work with (e.g. appearances.csv). Clubs.csv
-    first (always accurate for whatever's been scraped), falls back to the
-    bundled competitions reference table."""
-    clubs = load_clubs()
-    logo_map = (
-        clubs.dropna(subset=["competition_logo_url"])
-        .drop_duplicates("domestic_competition_id")
-        .set_index("domestic_competition_id")["competition_logo_url"]
-        .to_dict()
-    )
-    comp_logo_fallback, _ = _competition_image_fallbacks()
-    for cid, url in comp_logo_fallback.items():
-        logo_map.setdefault(cid, url)
-    return logo_map
 
 
 @st.cache_data(ttl=3600)
@@ -142,6 +139,14 @@ def load_transfers() -> pd.DataFrame:
     df["from_club_name"] = df["from_club_name"].map(_extract_club_name)
     df["to_club_name"] = df["to_club_name"].map(_extract_club_name)
     df["transfer_date"] = pd.to_datetime(df["transfer_date"], format="%d/%m/%Y", errors="coerce")
+    # Older rows predate the from/to_club_crest_url columns - the merge
+    # script backfills them on each row's next transfer-API refresh, but
+    # until then the column may not exist on disk at all yet.
+    for col in ("from_club_crest_url", "to_club_crest_url", "to_country_flag_url"):
+        if col not in df.columns:
+            df[col] = ""
+        else:
+            df[col] = df[col].fillna("")
     return df
 
 
