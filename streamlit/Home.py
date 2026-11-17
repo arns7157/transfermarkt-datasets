@@ -12,6 +12,13 @@ transfers = load_transfers()
 
 n_competities = players["current_club_domestic_competition_id"].nunique()
 
+competition_logos = (
+    players.dropna(subset=["competition_logo_url"])
+    .drop_duplicates("current_club_domestic_competition_id")
+    .sort_values("current_club_domestic_competition_id")["competition_logo_url"]
+    .tolist()
+)
+
 st.markdown(
     '<div class="app-header"><span style="font-size:1.9rem">⚽</span>'
     "<h1>Scouting platform</h1></div>",
@@ -28,6 +35,10 @@ col1.metric("Spelers", f"{len(players):,}".replace(",", "."))
 col2.metric("Clubs", f"{len(clubs):,}".replace(",", "."))
 col3.metric("Competities", n_competities)
 col4.metric("Transfers", f"{len(transfers):,}".replace(",", "."))
+
+if competition_logos:
+    st.write("")
+    st.image(competition_logos, width=42)
 
 st.write("")
 st.markdown("#### Waar wil je naartoe?")

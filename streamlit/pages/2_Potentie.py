@@ -36,6 +36,7 @@ tab_all, tab_broke, tab_minutes, tab_scoring = st.tabs(
 
 def render_table(df, extra_cols=None):
     cols = {
+        "club_crest_url": "Logo",
         "name": "Naam",
         "age": "Leeftijd",
         "position": "Positie",
@@ -53,6 +54,7 @@ def render_table(df, extra_cols=None):
         width="stretch",
         hide_index=True,
         column_config={
+            "Logo": st.column_config.ImageColumn(width="small"),
             "Min/wedstrijd (recent)": st.column_config.NumberColumn(format="%.0f"),
             "Min/wedstrijd (eerder)": st.column_config.NumberColumn(format="%.0f"),
             "G+A/90 (recent)": st.column_config.NumberColumn(format="%.2f"),

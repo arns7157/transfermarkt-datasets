@@ -3,9 +3,11 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils import (
+    club_crest_by_name,
     current_season_appearances,
     format_money,
     inject_theme,
+    inline_img,
     load_appearances,
     load_players,
     load_transfers,
@@ -52,13 +54,18 @@ with col_info:
     st.write("")
     contract = player.get("contract_expiration_date")
     contract_str = contract.strftime("%d/%m/%Y") if contract is not None and not isinstance(contract, float) else "–"
+    nat_flag = inline_img(player.get("citizenship_flag_url"))
+    club_crest = inline_img(player.get("club_crest_url"))
+    comp_logo = inline_img(player.get("competition_logo_url"))
     st.markdown(
         f"**Leeftijd:** {player.get('age', '–')} &nbsp;·&nbsp; "
         f"**Voet:** {player.get('foot', '–')} &nbsp;·&nbsp; "
         f"**Lengte:** {player.get('height_in_cm', '–')} cm  \n"
-        f"**Nationaliteit:** {player.get('country_of_citizenship', '–')}  \n"
-        f"**Huidige club:** {player.get('current_club_name', '–')}  \n"
-        f"**Contract tot:** {contract_str}"
+        f"**Nationaliteit:** {nat_flag}{player.get('country_of_citizenship', '–')}  \n"
+        f"**Huidige club:** {club_crest}{player.get('current_club_name', '–')} "
+        f"{comp_logo}  \n"
+        f"**Contract tot:** {contract_str}",
+        unsafe_allow_html=True,
     )
 
 col1, col2 = st.columns(2)
@@ -139,13 +146,23 @@ player_transfers = transfers[transfers["player_id"] == selected_id].sort_values(
 if player_transfers.empty:
     st.info("Geen transfers geregistreerd voor deze speler.")
 else:
+    crest_by_name = club_crest_by_name()
     tdisp = player_transfers[
         ["transfer_date", "from_club_name", "to_club_name", "transfer_fee", "market_value_at_transfer"]
     ].copy()
-    tdisp.columns = ["Datum", "Van", "Naar", "Transfersom", "Marktwaarde bij transfer"]
+    tdisp["from_crest"] = tdisp["from_club_name"].map(crest_by_name).fillna("")
+    tdisp["to_crest"] = tdisp["to_club_name"].map(crest_by_name).fillna("")
+    tdisp = tdisp[
+        ["transfer_date", "from_crest", "from_club_name", "to_crest", "to_club_name", "transfer_fee", "market_value_at_transfer"]
+    ]
+    tdisp.columns = ["Datum", "Logo (van)", "Van", "Logo (naar)", "Naar", "Transfersom", "Marktwaarde bij transfer"]
     st.dataframe(
         tdisp,
         width="stretch",
         hide_index=True,
-        column_config={"Datum": st.column_config.DateColumn(format="DD/MM/YYYY")},
+        column_config={
+            "Datum": st.column_config.DateColumn(format="DD/MM/YYYY"),
+            "Logo (van)": st.column_config.ImageColumn(width="small"),
+            "Logo (naar)": st.column_config.ImageColumn(width="small"),
+        },
     )

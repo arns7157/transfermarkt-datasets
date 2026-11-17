@@ -6,6 +6,7 @@ from utils import (
     current_season_appearances,
     format_money,
     inject_theme,
+    inline_img,
     load_appearances,
     load_players,
     load_valuations,
@@ -35,6 +36,17 @@ if len(selected_ids) < 2:
     st.stop()
 
 selected_players = players[players["player_id"].isin(selected_ids)]
+
+header_cols = st.columns(len(selected_players))
+for col, (_, p) in zip(header_cols, selected_players.iterrows()):
+    with col:
+        if isinstance(p.get("image_url"), str) and p["image_url"]:
+            st.image(p["image_url"], width=110)
+        club_crest = inline_img(p.get("club_crest_url"))
+        st.markdown(
+            f"**{p['name']}**  \n{club_crest}{p.get('current_club_name', '–')}",
+            unsafe_allow_html=True,
+        )
 
 rows = []
 for _, p in selected_players.iterrows():

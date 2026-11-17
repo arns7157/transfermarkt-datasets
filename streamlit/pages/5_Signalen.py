@@ -23,15 +23,18 @@ with tab_contract:
 
     st.caption(f"{len(soon)} spelers met een contract dat afloopt vóór {cutoff:%d/%m/%Y}")
     disp = soon[
-        ["name", "age", "position", "current_club_name", "contract_expiration_date", "market_value_in_eur"]
+        ["club_crest_url", "name", "age", "position", "current_club_name", "contract_expiration_date", "market_value_in_eur"]
     ].copy()
     disp["market_value_in_eur"] = disp["market_value_in_eur"].map(format_money)
-    disp.columns = ["Naam", "Leeftijd", "Positie", "Club", "Contract tot", "Marktwaarde"]
+    disp.columns = ["Logo", "Naam", "Leeftijd", "Positie", "Club", "Contract tot", "Marktwaarde"]
     st.dataframe(
         disp,
         width="stretch",
         hide_index=True,
-        column_config={"Contract tot": st.column_config.DateColumn(format="DD/MM/YYYY")},
+        column_config={
+            "Logo": st.column_config.ImageColumn(width="small"),
+            "Contract tot": st.column_config.DateColumn(format="DD/MM/YYYY"),
+        },
     )
 
 with tab_value:
@@ -51,25 +54,31 @@ with tab_value:
         / joined["market_value_in_eur_toen"]
         * 100
     )
-    joined = joined.join(players.set_index("player_id")[["name", "current_club_name", "position"]])
+    joined = joined.join(players.set_index("player_id")[["name", "current_club_name", "position", "club_crest_url"]])
 
     col_up, col_down = st.columns(2)
     with col_up:
         st.subheader("Grootste stijgers")
         top_up = joined.sort_values("verandering_pct", ascending=False).head(20)
-        disp_up = top_up[["name", "current_club_name", "position", "market_value_in_eur_toen", "market_value_in_eur_nu", "verandering_pct"]].copy()
+        disp_up = top_up[["club_crest_url", "name", "current_club_name", "position", "market_value_in_eur_toen", "market_value_in_eur_nu", "verandering_pct"]].copy()
         disp_up["market_value_in_eur_toen"] = disp_up["market_value_in_eur_toen"].map(format_money)
         disp_up["market_value_in_eur_nu"] = disp_up["market_value_in_eur_nu"].map(format_money)
         disp_up["verandering_pct"] = disp_up["verandering_pct"].round(1)
-        disp_up.columns = ["Naam", "Club", "Positie", "Toen", "Nu", "% verandering"]
-        st.dataframe(disp_up, width="stretch", hide_index=True)
+        disp_up.columns = ["Logo", "Naam", "Club", "Positie", "Toen", "Nu", "% verandering"]
+        st.dataframe(
+            disp_up, width="stretch", hide_index=True,
+            column_config={"Logo": st.column_config.ImageColumn(width="small")},
+        )
 
     with col_down:
         st.subheader("Grootste dalers")
         top_down = joined.sort_values("verandering_pct", ascending=True).head(20)
-        disp_down = top_down[["name", "current_club_name", "position", "market_value_in_eur_toen", "market_value_in_eur_nu", "verandering_pct"]].copy()
+        disp_down = top_down[["club_crest_url", "name", "current_club_name", "position", "market_value_in_eur_toen", "market_value_in_eur_nu", "verandering_pct"]].copy()
         disp_down["market_value_in_eur_toen"] = disp_down["market_value_in_eur_toen"].map(format_money)
         disp_down["market_value_in_eur_nu"] = disp_down["market_value_in_eur_nu"].map(format_money)
         disp_down["verandering_pct"] = disp_down["verandering_pct"].round(1)
-        disp_down.columns = ["Naam", "Club", "Positie", "Toen", "Nu", "% verandering"]
-        st.dataframe(disp_down, width="stretch", hide_index=True)
+        disp_down.columns = ["Logo", "Naam", "Club", "Positie", "Toen", "Nu", "% verandering"]
+        st.dataframe(
+            disp_down, width="stretch", hide_index=True,
+            column_config={"Logo": st.column_config.ImageColumn(width="small")},
+        )

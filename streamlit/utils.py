@@ -39,6 +39,73 @@ def _extract_club_name(value):
 
 
 @st.cache_data(ttl=3600)
+def load_clubs() -> pd.DataFrame:
+    return _read_csv("clubs")
+
+
+@st.cache_data(ttl=3600)
+def load_competitions() -> pd.DataFrame:
+    return _read_csv("competitions")
+
+
+def _competition_image_fallbacks() -> tuple[dict, dict]:
+    """competition_id -> logo_url / flag_url, from the bundled reference
+    table. Only used to fill gaps for competitions whose own clubs haven't
+    been (re-)scraped with the crest/logo/flag fields yet, or that have no
+    scraped clubs at all (international cups, national teams)."""
+    competitions = load_competitions()
+    logo_map = competitions.dropna(subset=["logo_url"]).set_index("competition_id")["logo_url"].to_dict()
+    flag_map = competitions.dropna(subset=["flag_url"]).set_index("competition_id")["flag_url"].to_dict()
+    return logo_map, flag_map
+
+
+def _enrich_with_club_images(players: pd.DataFrame, clubs: pd.DataFrame) -> pd.DataFrame:
+    """Guarantee best-effort club_crest_url / competition_logo_url /
+    country_flag_url / citizenship_flag_url columns for every player.
+    Prefers what the player's own scrape found; falls back to clubs.csv
+    (a different batch run may have (re-)scraped that same club more
+    recently), then to the bundled competitions reference table."""
+    players = players.copy()
+    clubs_by_id = clubs.copy()
+    clubs_by_id["club_id"] = pd.to_numeric(clubs_by_id["club_id"], errors="coerce").astype("Int64")
+    cur_id = pd.to_numeric(players.get("current_club_id"), errors="coerce").astype("Int64")
+
+    def club_fallback(col: str) -> pd.Series:
+        return clubs_by_id.dropna(subset=[col]).drop_duplicates("club_id").set_index("club_id")[col]
+
+    comp_logo_fallback, comp_flag_fallback = _competition_image_fallbacks()
+    comp_id = players.get("current_club_domestic_competition_id")
+
+    players["club_crest_url"] = players.get("current_club_crest_url").fillna(
+        cur_id.map(club_fallback("crest_url"))
+    )
+    players["competition_logo_url"] = (
+        players.get("current_club_competition_logo_url")
+        .fillna(cur_id.map(club_fallback("competition_logo_url")))
+        .fillna(comp_id.map(comp_logo_fallback))
+    )
+    players["country_flag_url"] = (
+        players.get("current_club_country_flag_url")
+        .fillna(cur_id.map(club_fallback("country_flag_url")))
+        .fillna(comp_id.map(comp_flag_fallback))
+    )
+    players["citizenship_flag_url"] = players.get("country_of_citizenship_flag_url")
+    # ImageColumn renders a missing/NaN cell as the literal text "None"
+    # instead of a blank cell - empty string displays cleanly instead.
+    for col in ("club_crest_url", "competition_logo_url", "country_flag_url", "citizenship_flag_url"):
+        players[col] = players[col].fillna("")
+    return players
+
+
+@st.cache_data(ttl=3600)
+def club_crest_by_name() -> dict:
+    """Best-effort club name -> crest_url, for places that only have a club
+    *name* to work with (e.g. transfers.csv's from/to club columns)."""
+    clubs = load_clubs()
+    return clubs.dropna(subset=["crest_url"]).drop_duplicates("name").set_index("name")["crest_url"].to_dict()
+
+
+@st.cache_data(ttl=3600)
 def load_players() -> pd.DataFrame:
     df = _read_csv("players")
     df["market_value_in_eur"] = pd.to_numeric(df["market_value_in_eur"], errors="coerce")
@@ -47,17 +114,7 @@ def load_players() -> pd.DataFrame:
     df["contract_expiration_date"] = pd.to_datetime(df["contract_expiration_date"], format="%d/%m/%Y", errors="coerce")
     df["age"] = pd.to_numeric(df["age"], errors="coerce").round().astype("Int64")
     df["market_value_m"] = df["market_value_in_eur"] / 1_000_000
-    return df
-
-
-@st.cache_data(ttl=3600)
-def load_clubs() -> pd.DataFrame:
-    return _read_csv("clubs")
-
-
-@st.cache_data(ttl=3600)
-def load_competitions() -> pd.DataFrame:
-    return _read_csv("competitions")
+    return _enrich_with_club_images(df, load_clubs())
 
 
 @st.cache_data(ttl=3600)
@@ -112,6 +169,15 @@ def position_badge(position: str) -> str:
         f'padding:1px 9px;border-radius:999px;font-size:0.78rem;font-weight:600;'
         f'white-space:nowrap;">{label}</span>'
     )
+
+
+def inline_img(url, height: int = 18) -> str:
+    """Small inline <img> tag for use inside st.markdown(unsafe_allow_html=True),
+    e.g. next to a club/competition/country name. Returns '' for a missing URL
+    so callers can splice it in unconditionally."""
+    if not isinstance(url, str) or not url:
+        return ""
+    return f'<img src="{url}" height="{height}" style="vertical-align:middle;border-radius:3px;margin-right:4px;">'
 
 
 def inject_theme() -> None:

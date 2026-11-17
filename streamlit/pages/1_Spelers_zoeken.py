@@ -88,32 +88,40 @@ st.caption(f"{len(filtered):,} spelers".replace(",", "."))
 
 display = filtered[
     [
+        "club_crest_url",
         "name",
         "age",
         "position",
         "sub_position",
         "foot",
         "current_club_name",
+        "competition_logo_url",
+        "country_flag_url",
         "country",
         "competition_name",
         "matches_this_season",
         "market_value_m",
         "contract_expiration_date",
+        "citizenship_flag_url",
         "country_of_citizenship",
     ]
 ].rename(
     columns={
+        "club_crest_url": "Logo",
         "name": "Naam",
         "age": "Leeftijd",
         "position": "Positie",
         "sub_position": "Subpositie",
         "foot": "Voet",
         "current_club_name": "Club",
+        "competition_logo_url": "Comp.",
+        "country_flag_url": "Vlag",
         "country": "Land",
         "competition_name": "Competitie",
         "matches_this_season": "Wedstrijden (seizoen)",
         "market_value_m": "Marktwaarde (M€)",
         "contract_expiration_date": "Contract tot",
+        "citizenship_flag_url": "Nat.",
         "country_of_citizenship": "Nationaliteit",
     }
 )
@@ -124,6 +132,10 @@ st.dataframe(
     hide_index=True,
     height=560,
     column_config={
+        "Logo": st.column_config.ImageColumn(width="small"),
+        "Comp.": st.column_config.ImageColumn(width="small"),
+        "Vlag": st.column_config.ImageColumn(width="small"),
+        "Nat.": st.column_config.ImageColumn(width="small"),
         "Marktwaarde (M€)": st.column_config.NumberColumn(format="%.1f"),
         "Contract tot": st.column_config.DateColumn(format="DD/MM/YYYY"),
     },
