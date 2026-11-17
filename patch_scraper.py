@@ -156,6 +156,55 @@ def patch_clubs():
     return True
 
 
+def patch_club_market_value():
+    """Fix total_market_value in clubs.py: oude 'dataMarktwert'-div bestaat
+    niet meer.
+
+    Transfermarkt's club-pagina is herbouwd; de marktwaarde staat nu in
+    <a class="data-header__market-value-wrapper">, met het bedrag en de
+    munteenheid in aparte <span>'s rond de tekst zelf, bv.
+      <a class="data-header__market-value-wrapper">
+        <span class="waehrung">€</span>238.20<span class="waehrung">M</span>
+        <p class="data-header__last-update">Total market value</p>
+      </a>
+    Alle tekstnodes die GEEN kind zijn van de 'Total market value'-<p>
+    samenvoegen geeft "€238.20M". Bevestigd tegen de live Club Brugge-pagina.
+
+    coach_name kon nergens meer op deze pagina teruggevonden worden (geen
+    'Mitarbeiter'/coach-sectie meer aanwezig) - die blijft leeg, geen fix
+    mogelijk zonder een andere databron.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'clubs.py'
+    if not fpath.exists():
+        print(f"  clubs.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    old_line = "    attributes['total_market_value'] = response.css('div.dataMarktwert a::text').get()"
+    new_line = (
+        "    market_value_parts = [\n"
+        "      t.strip() for t in response.xpath(\n"
+        "        \"//a[contains(@class,'data-header__market-value-wrapper')]\"\n"
+        "        \"//text()[not(ancestor::p)]\"\n"
+        "      ).getall() if t.strip()\n"
+        "    ]\n"
+        "    attributes['total_market_value'] = ''.join(market_value_parts) or None"
+    )
+
+    if new_line in src:
+        print("  clubs.py: market-value-patch bestaat al - overslaan")
+        return True
+    if old_line not in src:
+        print("  clubs.py: oude total_market_value-regel niet gevonden - overslaan")
+        return False
+
+    src = src.replace(old_line, new_line, 1)
+    fpath.write_text(src)
+    print("  ✅ clubs.py: total_market_value-selector bijgewerkt")
+    return True
+
+
 def patch_player_names():
     """Voegt voornaam/achternaam extractie toe aan players.py.
 
@@ -422,6 +471,7 @@ def main():
 
     patch_players()
     patch_clubs()
+    patch_club_market_value()
     patch_player_names()
     patch_appearances()
     patch_common()
