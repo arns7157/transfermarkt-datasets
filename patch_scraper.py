@@ -205,6 +205,60 @@ def patch_club_market_value():
     return True
 
 
+def patch_club_images():
+    """Voegt crest_url, competition_logo_url en country_flag_url toe aan clubs.py.
+
+    Alle drie staan al op de clubpagina zelf (bevestigd live tegen Club
+    Brugge): het clublogo in div.data-header__profile-container (vaste
+    src, niet lazy-loaded), het competitielogo in de "League level"-link
+    bovenaan (srcset met een 1x/2x variant - we nemen de hoogste
+    resolutie), en de landvlag naast "League level:" (lazy-loaded, dus
+    @data-src i.p.v. @src).
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'clubs.py'
+    if not fpath.exists():
+        print(f"  clubs.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    if "attributes['crest_url']" in src:
+        print("  clubs.py: logo/vlag-extractie bestaat al - overslaan")
+        return True
+
+    marker = "    attributes['total_market_value'] = ''.join(market_value_parts) or None\n"
+    if marker not in src:
+        print("  clubs.py: anker voor logo/vlag-extractie niet gevonden - overslaan")
+        return False
+
+    addition = (
+        marker +
+        "\n"
+        "    attributes['crest_url'] = response.xpath(\n"
+        "      \"//div[@class='data-header__profile-container']/img/@src\"\n"
+        "    ).get()\n"
+        "\n"
+        "    competition_logo_srcset = response.xpath(\n"
+        "      \"//a[contains(@class,'data-header__box__club-link')]/img/@srcset\"\n"
+        "    ).get()\n"
+        "    if competition_logo_srcset:\n"
+        "      logo_candidates = [\n"
+        "        c.strip().rsplit(' ', 1)[0] for c in competition_logo_srcset.split(',') if c.strip()\n"
+        "      ]\n"
+        "      attributes['competition_logo_url'] = logo_candidates[-1] if logo_candidates else None\n"
+        "    else:\n"
+        "      attributes['competition_logo_url'] = None\n"
+        "\n"
+        "    attributes['country_flag_url'] = response.xpath(\n"
+        "      \"//strong[contains(text(),'League level')]/following-sibling::span[1]/a/img/@data-src\"\n"
+        "    ).get()\n"
+    )
+    src = src.replace(marker, addition, 1)
+    fpath.write_text(src)
+    print("  ✅ clubs.py: crest_url, competition_logo_url en country_flag_url toegevoegd")
+    return True
+
+
 def patch_player_names():
     """Voegt voornaam/achternaam extractie toe aan players.py.
 
@@ -311,6 +365,60 @@ def patch_current_club_name():
     src = src.replace(old_block, new_block, 1)
     fpath.write_text(src)
     print("  ✅ players.py: current_club bevat nu ook de naam")
+    return True
+
+
+def patch_player_flags():
+    """Voegt vlag-URL's toe aan players.py: citizenship_flag_url en
+    place_of_birth.flag_url.
+
+    Beide vlag-afbeeldingen stonden al op de pagina (enkel @title - de
+    landnaam - werd ooit uitgelezen). Citizenship's vlag is niet lazy-
+    loaded (@src rechtstreeks bruikbaar); place_of_birth's vlag zit in een
+    lazy-loaded element (@src is een base64-placeholder, de echte url
+    staat in @data-src). Bevestigd live tegen Kevin De Bruyne's profiel.
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'players.py'
+    if not fpath.exists():
+        print(f"  players.py niet gevonden op {fpath}")
+        return False
+
+    src = fpath.read_text()
+
+    if "citizenship_flag_url" in src:
+        print("  players.py: vlag-URL extractie bestaat al - overslaan")
+        return True
+
+    old_place = (
+        "    attributes['place_of_birth'] = {\n"
+        "      'country': response.xpath(\"//span[text()='Place of birth:']/following::span[1]/span/img/@title\").get(),\n"
+        "      'city': response.xpath(\"//span[text()='Place of birth:']/following::span[1]/span/text()\").get()\n"
+        "    }\n"
+    )
+    new_place = (
+        "    attributes['place_of_birth'] = {\n"
+        "      'country': response.xpath(\"//span[text()='Place of birth:']/following::span[1]/span/img/@title\").get(),\n"
+        "      'city': response.xpath(\"//span[text()='Place of birth:']/following::span[1]/span/text()\").get(),\n"
+        "      'flag_url': response.xpath(\"//span[text()='Place of birth:']/following::span[1]/span/img/@data-src\").get()\n"
+        "    }\n"
+    )
+    if old_place not in src:
+        print("  players.py: place_of_birth-blok niet gevonden - overslaan")
+        return False
+    src = src.replace(old_place, new_place, 1)
+
+    old_citizenship = "    attributes['citizenship'] = response.xpath(\"//span[text()='Citizenship:']/following::span[1]/img/@title\").get()\n"
+    new_citizenship = (
+        old_citizenship +
+        "    attributes['citizenship_flag_url'] = response.xpath(\"//span[text()='Citizenship:']/following::span[1]/img/@src\").get()\n"
+    )
+    if old_citizenship not in src:
+        print("  players.py: citizenship-regel niet gevonden - overslaan")
+        return False
+    src = src.replace(old_citizenship, new_citizenship, 1)
+
+    fpath.write_text(src)
+    print("  ✅ players.py: citizenship_flag_url en place_of_birth.flag_url toegevoegd")
     return True
 
 
@@ -524,8 +632,10 @@ def main():
     patch_players()
     patch_clubs()
     patch_club_market_value()
+    patch_club_images()
     patch_player_names()
     patch_current_club_name()
+    patch_player_flags()
     patch_appearances()
     patch_common()
     patch_club_tiers()
