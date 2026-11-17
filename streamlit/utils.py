@@ -98,6 +98,25 @@ def _enrich_with_club_images(players: pd.DataFrame, clubs: pd.DataFrame) -> pd.D
 
 
 @st.cache_data(ttl=3600)
+def competition_logo_map() -> dict:
+    """Best-effort competition_id -> logo_url, for places that only have a
+    bare competition_id to work with (e.g. appearances.csv). Clubs.csv
+    first (always accurate for whatever's been scraped), falls back to the
+    bundled competitions reference table."""
+    clubs = load_clubs()
+    logo_map = (
+        clubs.dropna(subset=["competition_logo_url"])
+        .drop_duplicates("domestic_competition_id")
+        .set_index("domestic_competition_id")["competition_logo_url"]
+        .to_dict()
+    )
+    comp_logo_fallback, _ = _competition_image_fallbacks()
+    for cid, url in comp_logo_fallback.items():
+        logo_map.setdefault(cid, url)
+    return logo_map
+
+
+@st.cache_data(ttl=3600)
 def club_crest_by_name() -> dict:
     """Best-effort club name -> crest_url, for places that only have a club
     *name* to work with (e.g. transfers.csv's from/to club columns)."""

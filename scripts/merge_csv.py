@@ -101,6 +101,32 @@ def merge():
             for pid, mv in mv_raw.items():
                 mv_lookup[str(pid)] = parse_market_value(mv)
         print(f"Marktwaarden geladen: {len(mv_lookup)}")
+    # PATCH: hoogste marktwaarde berekenen uit de volledige historische
+    # reeks i.p.v. ze te lezen uit een losse HTML-div op de spelerspagina -
+    # dat hele marktwaarde-widget is intussen een JS-component geworden
+    # (tm-market-value-development-graph-integrated), dus de oude div
+    # bestaat niet meer en highest_market_value_in_eur stond daardoor
+    # altijd leeg. We kennen elke historische waarde toch al (zowel wat
+    # al in player_valuations.csv stond als wat deze run net opgehaald
+    # is via de marktwaarde-API) - het hoogste punt daarvan IS per
+    # definitie de hoogste marktwaarde ooit.
+    mv_highest_lookup = {}
+    def _bump_highest(pid, val):
+        if not pid or val in ('', None):
+            return
+        try:
+            val = int(val)
+        except (TypeError, ValueError):
+            return
+        if val > mv_highest_lookup.get(pid, 0):
+            mv_highest_lookup[pid] = val
+    for r in load_csv_existing(OUT / 'player_valuations.csv'):
+        _bump_highest(str(r.get('player_id', '')), r.get('market_value_in_eur'))
+    for v in load_jsonl(RAW / 'valuations.json'):
+        pid = str(v.get('player_id', ''))
+        vmv_raw = v.get('market_value_in_eur', '') or v.get('market_value', '') or v.get('mw', '')
+        _bump_highest(pid, parse_market_value(str(vmv_raw)) if vmv_raw else '')
+    print(f"Hoogste marktwaarde gekend voor {len(mv_highest_lookup)} spelers")
     # ── CLUBS ──
     clubs = load_jsonl(RAW / 'clubs.json')
     club_lookup = {}
@@ -226,9 +252,11 @@ def merge():
             mv_raw = p.get('current_market_value') or p.get('market_value') or ''
             if mv_raw:
                 mv = parse_market_value(str(mv_raw))
-        mv_high_raw = p.get('highest_market_value') or ''
-        try: mv_high = int(str(mv_high_raw).replace('e','').replace(',','').strip()) if mv_high_raw else ''
-        except: mv_high = ''
+        _bump_highest(str(player_id), mv)
+        mv_high = mv_highest_lookup.get(str(player_id), '')
+        if not mv_high:
+            mv_high_raw = p.get('highest_market_value') or ''
+            mv_high = parse_market_value(str(mv_high_raw)) if mv_high_raw else ''
         first_name = p.get('name', '') or ''
         last_name = p.get('last_name', '') or ''
         full_name = f"{first_name} {last_name}".strip() or first_name

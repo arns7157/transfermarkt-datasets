@@ -1,9 +1,11 @@
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
 from utils import (
     club_crest_by_name,
+    competition_logo_map,
     current_season_appearances,
     format_money,
     inject_theme,
@@ -95,10 +97,42 @@ else:
         x="date",
         y="market_value_in_eur",
         markers=True,
-        labels={"date": "Datum", "market_value_in_eur": "Marktwaarde (€)"},
+        hover_data={"club_name": True},
+        labels={"date": "Datum", "market_value_in_eur": "Marktwaarde (€)", "club_name": "Club"},
     )
     fig.update_traces(line_color="#22C55E", marker_color="#22C55E")
     style_dark_chart(fig)
+
+    # Clublogo bij elk punt: welke club de speler was op dat moment.
+    # Plotly's layout.image.sizex/sizey willen een kaal getal - op een
+    # datum-as is dat het aantal milliseconden (de interne representatie),
+    # een pandas.Timedelta-object zelf wordt geweigerd.
+    crest_by_name = club_crest_by_name()
+    x_span = player_val_history["date"].max() - player_val_history["date"].min()
+    if pd.isna(x_span) or x_span == pd.Timedelta(0):
+        x_span = pd.Timedelta(days=365)
+    x_span_ms = x_span / pd.Timedelta(milliseconds=1)
+    y_span = player_val_history["market_value_in_eur"].max() - player_val_history["market_value_in_eur"].min()
+    if not y_span:
+        y_span = player_val_history["market_value_in_eur"].max() or 1
+    for _, row in player_val_history.iterrows():
+        crest = crest_by_name.get(row.get("club_name"))
+        if not crest:
+            continue
+        fig.add_layout_image(
+            dict(
+                source=crest,
+                x=row["date"],
+                y=row["market_value_in_eur"],
+                xref="x",
+                yref="y",
+                sizex=x_span_ms * 0.045,
+                sizey=y_span * 0.16,
+                xanchor="center",
+                yanchor="middle",
+                layer="above",
+            )
+        )
     st.plotly_chart(fig, width="stretch")
 
 st.divider()
@@ -121,7 +155,14 @@ else:
         .reset_index()
         .rename(columns={"competition_id": "Competitie"})
     )
-    st.dataframe(summary, width="stretch", hide_index=True)
+    comp_logos = competition_logo_map()
+    summary.insert(0, "Logo", summary["Competitie"].map(comp_logos).fillna(""))
+    st.dataframe(
+        summary,
+        width="stretch",
+        hide_index=True,
+        column_config={"Logo": st.column_config.ImageColumn(width="small")},
+    )
 
     fig = go.Figure()
     fig.add_bar(x=player_apps["date"], y=player_apps["minutes_played"], name="Minuten", marker_color="#3B82F6")
@@ -138,13 +179,17 @@ else:
     st.subheader("Recente wedstrijden")
     recent = all_player_apps.sort_values("date", ascending=False).head(10)[
         ["date", "competition_id", "goals", "assists", "minutes_played", "yellow_cards", "red_cards"]
-    ]
-    recent.columns = ["Datum", "Competitie", "Goals", "Assists", "Minuten", "Geel", "Rood"]
+    ].copy()
+    recent.insert(1, "Logo", recent["competition_id"].map(competition_logo_map()).fillna(""))
+    recent.columns = ["Datum", "Logo", "Competitie", "Goals", "Assists", "Minuten", "Geel", "Rood"]
     st.dataframe(
         recent,
         width="stretch",
         hide_index=True,
-        column_config={"Datum": st.column_config.DateColumn(format="DD/MM/YYYY")},
+        column_config={
+            "Datum": st.column_config.DateColumn(format="DD/MM/YYYY"),
+            "Logo": st.column_config.ImageColumn(width="small"),
+        },
     )
 
 st.divider()
