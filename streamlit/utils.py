@@ -211,13 +211,20 @@ def player_label(row) -> str:
     return f"{row['name']} ({club})"
 
 
-def image_multiselect(label: str, options: list, image_lookup: dict, key_prefix: str, max_shown: int = 150) -> list:
-    """Dropdown-achtige multiselect die een échte logo/vlag-afbeelding naast
-    elke optie toont. Een native <select>/st.multiselect kan dat niet - een
-    <option>-element mag geen <img> bevatten, dat is een HTML-beperking,
-    geen Streamlit-beperking. st.popover + losse checkboxes omzeilt dat:
-    elke rij is een gewone afbeelding + checkbox, en het paneel opent/sluit
-    als een dropdown."""
+def image_multiselect(label: str, options: list, image_lookups, key_prefix: str, max_shown: int = 150) -> list:
+    """Dropdown-achtige multiselect die één of meer échte logo/vlag-
+    afbeeldingen naast elke optie toont. Een native <select>/st.multiselect
+    kan dat niet - een <option>-element mag geen <img> bevatten, dat is een
+    HTML-beperking, geen Streamlit-beperking. st.popover + losse checkboxes
+    omzeilt dat: elke rij is een afbeelding(en) + checkbox, en het paneel
+    opent/sluit als een dropdown.
+
+    image_lookups is een dict (één afbeelding per rij) of een lijst van
+    dicts (meerdere afbeeldingen per rij, in volgorde - bv. clublogo +
+    competitievlag + competitielogo)."""
+    if isinstance(image_lookups, dict):
+        image_lookups = [image_lookups]
+
     state_key = f"{key_prefix}__selected"
     selected_before = st.session_state.get(state_key, [])
 
@@ -234,11 +241,13 @@ def image_multiselect(label: str, options: list, image_lookup: dict, key_prefix:
         if len(matches) > max_shown:
             st.caption(f"{max_shown} van {len(matches)} getoond - verfijn je zoekopdracht voor meer.")
         for opt in shown:
-            c1, c2 = st.columns([1, 6])
-            img = image_lookup.get(opt)
-            if img:
-                c1.image(img, width=22)
-            c2.checkbox(opt, key=f"{key_prefix}__cb__{opt}", value=opt in selected_before)
+            col_widths = [0.5] * len(image_lookups) + [5]
+            cols = st.columns(col_widths, vertical_alignment="center", gap="small")
+            for lookup, col in zip(image_lookups, cols[:-1]):
+                img = lookup.get(opt)
+                if img:
+                    col.image(img, width=22)
+            cols[-1].checkbox(opt, key=f"{key_prefix}__cb__{opt}", value=opt in selected_before)
 
     # Items buiten de huidige zoekfilter/weergavelimiet blijven geselecteerd
     # (hun checkbox is dit keer niet getekend, dus niet overschrijven).
@@ -335,6 +344,21 @@ def inject_theme() -> None:
         .app-header h1 {margin: 0; font-size: 1.9rem;}
         .app-subtitle {color: #6B7280; font-size: 0.95rem; margin-bottom: 1.4rem;}
         .pill-row {display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px 0;}
+        /* image_multiselect()-paneel: elke rij (logo/vlag(en) + checkbox)
+           is een stHorizontalBlock binnen de popover - wat strakker tegen
+           elkaar, een hover-highlight, en de fullscreen-hover-knop op de
+           kleine logo's (16x16) weggewerkt, die daar niets toevoegt. */
+        div[data-testid="stPopoverBody"] div[data-testid="stHorizontalBlock"] {
+            padding: 3px 6px;
+            border-radius: 6px;
+            align-items: center;
+        }
+        div[data-testid="stPopoverBody"] div[data-testid="stHorizontalBlock"]:hover {
+            background: #F0F2F6;
+        }
+        div[data-testid="stPopoverBody"] div[data-testid="stElementToolbar"] {display: none;}
+        div[data-testid="stPopoverBody"] div[data-testid="stImageContainer"] img {border-radius: 3px;}
+        div[data-testid="stPopoverBody"] label[data-testid="stWidgetLabel"] p {font-size: 0.92rem;}
         </style>
         """,
         unsafe_allow_html=True,

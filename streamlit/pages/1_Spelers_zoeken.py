@@ -42,13 +42,17 @@ def _image_lookup(col: str, key: str) -> dict:
 
 country_flag_by_name = _image_lookup("country_flag_url", "country")
 comp_logo_by_name = _image_lookup("competition_logo_url", "competition_name")
+comp_flag_by_name = _image_lookup("country_flag_url", "competition_name")
 club_crest_by_name_local = _image_lookup("club_crest_url", "current_club_name")
+club_flag_by_name = _image_lookup("country_flag_url", "current_club_name")
+club_comp_logo_by_name = _image_lookup("competition_logo_url", "current_club_name")
+citizenship_flag_by_name = _image_lookup("citizenship_flag_url", "country_of_citizenship")
 
 with st.sidebar:
     st.header("Filters")
 
-    # Land/Competitie/Club gebruiken image_multiselect() i.p.v. de
-    # standaard st.multiselect: die toont een échte logo/vlag-afbeelding
+    # Land/Competitie/Club/Nationaliteit gebruiken image_multiselect() i.p.v.
+    # de standaard st.multiselect: die toont de échte logo/vlag-afbeelding(en)
     # naast elke optie in het dropdown-paneel zelf (via st.popover).
     country_options = sorted(players["country"].dropna().unique())
     selected_countries = image_multiselect("Land", country_options, country_flag_by_name, "land")
@@ -56,18 +60,27 @@ with st.sidebar:
     country_scoped = players[players["country"].isin(selected_countries)] if selected_countries else players
 
     comp_options = sorted(country_scoped["competition_name"].dropna().unique())
-    selected_comps = image_multiselect("Competitie", comp_options, comp_logo_by_name, "competitie")
+    selected_comps = image_multiselect(
+        "Competitie", comp_options, [comp_logo_by_name, comp_flag_by_name], "competitie"
+    )
 
     scoped = country_scoped[country_scoped["competition_name"].isin(selected_comps)] if selected_comps else country_scoped
 
     club_options = sorted(scoped["current_club_name"].dropna().unique())
-    selected_clubs = image_multiselect("Club", club_options, club_crest_by_name_local, "club")
+    selected_clubs = image_multiselect(
+        "Club",
+        club_options,
+        [club_crest_by_name_local, club_flag_by_name, club_comp_logo_by_name],
+        "club",
+    )
 
     position_options = sorted(players["position"].dropna().unique())
     selected_positions = st.multiselect("Positie", position_options)
 
     nationality_options = sorted(players["country_of_citizenship"].dropna().unique())
-    selected_nationalities = st.multiselect("Nationaliteit", nationality_options)
+    selected_nationalities = image_multiselect(
+        "Nationaliteit", nationality_options, citizenship_flag_by_name, "nationaliteit"
+    )
 
     foot_options = sorted(players["foot"].dropna().unique())
     selected_feet = st.multiselect("Voet", foot_options)
