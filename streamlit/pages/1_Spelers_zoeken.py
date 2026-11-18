@@ -2,6 +2,7 @@ import streamlit as st
 
 from utils import (
     current_season_appearances,
+    image_multiselect,
     inject_theme,
     load_appearances,
     load_competitions,
@@ -46,32 +47,21 @@ club_crest_by_name_local = _image_lookup("club_crest_url", "current_club_name")
 with st.sidebar:
     st.header("Filters")
 
-    # Een native multiselect kan geen <img> tonen in zijn opties (enkel
-    # tekst) - vlag-emoji's renderen op Windows/Chromium zonder het juiste
-    # lettertype als een kale lettercode i.p.v. een echte vlag, dus voor
-    # Land/Competitie/Club tonen we i.p.v. daarvan steeds de échte
-    # logo's/vlaggen in een previewrij zodra er iets geselecteerd is.
+    # Land/Competitie/Club gebruiken image_multiselect() i.p.v. de
+    # standaard st.multiselect: die toont een échte logo/vlag-afbeelding
+    # naast elke optie in het dropdown-paneel zelf (via st.popover).
     country_options = sorted(players["country"].dropna().unique())
-    selected_countries = st.multiselect("Land", country_options)
-    country_flags = [country_flag_by_name[c] for c in selected_countries if country_flag_by_name.get(c)]
-    if country_flags:
-        st.image(country_flags, width=28)
+    selected_countries = image_multiselect("Land", country_options, country_flag_by_name, "land")
 
     country_scoped = players[players["country"].isin(selected_countries)] if selected_countries else players
 
     comp_options = sorted(country_scoped["competition_name"].dropna().unique())
-    selected_comps = st.multiselect("Competitie", comp_options)
-    comp_logos = [comp_logo_by_name[c] for c in selected_comps if comp_logo_by_name.get(c)]
-    if comp_logos:
-        st.image(comp_logos, width=28)
+    selected_comps = image_multiselect("Competitie", comp_options, comp_logo_by_name, "competitie")
 
     scoped = country_scoped[country_scoped["competition_name"].isin(selected_comps)] if selected_comps else country_scoped
 
     club_options = sorted(scoped["current_club_name"].dropna().unique())
-    selected_clubs = st.multiselect("Club", club_options)
-    club_crests = [club_crest_by_name_local[c] for c in selected_clubs if club_crest_by_name_local.get(c)]
-    if club_crests:
-        st.image(club_crests, width=28)
+    selected_clubs = image_multiselect("Club", club_options, club_crest_by_name_local, "club")
 
     position_options = sorted(players["position"].dropna().unique())
     selected_positions = st.multiselect("Positie", position_options)

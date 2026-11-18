@@ -211,6 +211,43 @@ def player_label(row) -> str:
     return f"{row['name']} ({club})"
 
 
+def image_multiselect(label: str, options: list, image_lookup: dict, key_prefix: str, max_shown: int = 150) -> list:
+    """Dropdown-achtige multiselect die een échte logo/vlag-afbeelding naast
+    elke optie toont. Een native <select>/st.multiselect kan dat niet - een
+    <option>-element mag geen <img> bevatten, dat is een HTML-beperking,
+    geen Streamlit-beperking. st.popover + losse checkboxes omzeilt dat:
+    elke rij is een gewone afbeelding + checkbox, en het paneel opent/sluit
+    als een dropdown."""
+    state_key = f"{key_prefix}__selected"
+    selected_before = st.session_state.get(state_key, [])
+
+    # Geen live tellertje in de knop-tekst: st.popover open/sluiten en de
+    # knop-tekst zelf triggeren geen script-rerun, dus een "(N)"-count hier
+    # zou altijd één klik achterlopen. De checkboxes in het paneel zelf
+    # tonen de actuele selectie wel meteen correct.
+    with st.popover(label, width="stretch"):
+        search = st.text_input(
+            "Zoeken", key=f"{key_prefix}__search", label_visibility="collapsed", placeholder=f"Zoek {label.lower()}..."
+        )
+        matches = [o for o in options if not search or search.lower() in o.lower()]
+        shown = matches[:max_shown]
+        if len(matches) > max_shown:
+            st.caption(f"{max_shown} van {len(matches)} getoond - verfijn je zoekopdracht voor meer.")
+        for opt in shown:
+            c1, c2 = st.columns([1, 6])
+            img = image_lookup.get(opt)
+            if img:
+                c1.image(img, width=22)
+            c2.checkbox(opt, key=f"{key_prefix}__cb__{opt}", value=opt in selected_before)
+
+    # Items buiten de huidige zoekfilter/weergavelimiet blijven geselecteerd
+    # (hun checkbox is dit keer niet getekend, dus niet overschrijven).
+    selected = [opt for opt in shown if st.session_state.get(f"{key_prefix}__cb__{opt}")]
+    selected += [opt for opt in selected_before if opt not in shown]
+    st.session_state[state_key] = selected
+    return selected
+
+
 def position_badge(position: str) -> str:
     color = POSITION_COLORS.get(position, "#6B7280")
     label = position or "–"
