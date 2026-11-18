@@ -131,9 +131,14 @@ jobs:
           cd /tmp/scraper
           for SEASON in $SEASONS; do
             echo "=== Clubs seizoen $SEASON ==="
+            # TIJDELIJK: LOG_LEVEL=INFO + DUPEFILTER_DEBUG om te zien waarom
+            # de eastern_europe-batch 0 clubs oplevert (normaal LOG_LEVEL=ERROR,
+            # dat verbergt dit soort "0 resultaten, geen crash" stil falen
+            # volledig). Terugzetten naar ERROR zodra de oorzaak bekend is.
             python3 -m scrapy crawl clubs \
               -a parents=$GITHUB_WORKSPACE/data/competitions/$BATCH.json \
               -a season=$SEASON \
+              -s LOG_LEVEL=INFO -s DUPEFILTER_DEBUG=1 \
               >> $GITHUB_WORKSPACE/data/raw/clubs.json || true
           done
           echo "Clubs nieuw: $(wc -l < $GITHUB_WORKSPACE/data/raw/clubs.json)"
