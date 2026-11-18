@@ -1,5 +1,6 @@
 import ast
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -392,6 +393,28 @@ def season_start_for(date: pd.Timestamp) -> pd.Timestamp:
     return pd.Timestamp(year=year, month=7, day=1)
 
 
+# U21/U23/B/II-suffixed clubs are reserve squads, not a first team - catches
+# most of them by name (Ajax Amsterdam U21, VfB Stuttgart II, Villarreal CF B).
+# A handful use a different naming convention with no common pattern, so
+# those are listed explicitly.
+_RESERVE_TEAM_SUFFIX_RE = re.compile(r"(\bU1[6-9]\b|\bU2[0-3]\b|\bII$| B$)", re.IGNORECASE)
+_RESERVE_TEAM_EXACT_NAMES = {
+    "Real Madrid Castilla",
+    "Juventus Next Gen",
+    "CA Osasuna Promesas",
+    "Sevilla Atlético",
+    "Atlético Madrileño",
+    "Betis Deportivo Balompié",
+    "RC Deportivo Fabril",
+}
+
+
+def _is_reserve_team(club_name) -> bool:
+    if not isinstance(club_name, str):
+        return False
+    return bool(_RESERVE_TEAM_SUFFIX_RE.search(club_name)) or club_name in _RESERVE_TEAM_EXACT_NAMES
+
+
 def compute_breakout_candidates(
     players: pd.DataFrame,
     appearances: pd.DataFrame,
@@ -445,4 +468,5 @@ def compute_breakout_candidates(
 
     result = merged.join(players.set_index("player_id"), how="inner")
     result = result[result["age"] <= max_age]
+    result = result[~result["current_club_name"].map(_is_reserve_team)]
     return result.sort_values("potential_score", ascending=False)

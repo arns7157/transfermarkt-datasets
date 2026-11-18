@@ -97,6 +97,9 @@ with st.expander("Hoe wordt dit berekend?"):
         - de stijging in goals+assists per 90 minuten,
         - een bonus als de speler eerder dit seizoen nog geen minuten had.
 
+        Spelers bij een U21/U23/B-elftal of andere reserve-ploeg worden eruit
+        gefilterd: het gaat hier om doorbraak bij het eerste elftal.
+
         Dit is een signaal, geen eindoordeel — bekijk altijd het spelerprofiel
         voor context (blessures, tegenstanders, speelpositie).
         """
