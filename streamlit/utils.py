@@ -212,6 +212,92 @@ def player_label(row) -> str:
     return f"{row['name']} ({club})"
 
 
+TIER_LABELS_NL = {
+    "First Tier": "1e",
+    "Second Tier": "2e",
+    "Third Tier": "3e",
+    "Fourth Tier": "4e",
+    "Fifth Tier": "5e",
+    "Sixth Tier": "6e",
+    "Play-Offs": "Play-offs",
+    "Reserve league": "Reserveliga",
+    "Regional Championship": "Regionaal",
+}
+
+
+def truncate_text(text, max_len: int) -> str:
+    """Hard karaktercap met ellipsis - st.dataframe's column_config width is
+    maar een richtwaarde, de kolom groeit toch mee met de langste
+    celwaarde, dus dit is de enige manier om een kolom echt smal te
+    houden."""
+    if not isinstance(text, str):
+        return text
+    return text if len(text) <= max_len else text[: max_len - 1].rstrip() + "…"
+
+
+def attach_competition_info(players: pd.DataFrame, competitions: pd.DataFrame) -> pd.DataFrame:
+    """Voegt competition_name/country/niveau toe aan een players-dataframe,
+    afgeleid van current_club_domestic_competition_id. competition_display
+    combineert naam+niveau in één tekst (bv. "LaLiga (1e)") - scheelt een
+    hele kolom in de tabellen, zonder dat de losse competition_name/niveau-
+    kolommen verdwijnen (die blijven nodig voor filters). Een harde lengte-
+    cap voorkomt dat één lange competitienaam de hele tabelbreedte opeist -
+    st.dataframe's kolombreedte is maar een richtwaarde, de kolom groeit
+    toch mee met de langste celwaarde."""
+    comp = competitions.set_index("competition_id")
+    cid = players["current_club_domestic_competition_id"]
+    players = players.copy()
+    players["competition_name"] = cid.map(comp["name"])
+    players["country"] = cid.map(comp["country"])
+    players["niveau"] = cid.map(comp["tier"]).map(lambda t: TIER_LABELS_NL.get(t, t))
+    niveau_suffix = players["niveau"].fillna("").map(lambda v: f" ({v})" if v else "")
+    display = players["competition_name"].fillna("") + niveau_suffix
+    players["competition_display"] = display.map(lambda t: truncate_text(t, 24))
+    return players
+
+
+def render_player_table(
+    df: pd.DataFrame,
+    column_map: dict,
+    key: str,
+    extra_column_config: dict | None = None,
+    height: int | None = None,
+) -> None:
+    """Compacte, klikbare spelerstabel. df moet een 'player_id'-kolom hebben
+    (of player_id als index); column_map is {bronkolom: label} in
+    weergavevolgorde. Bij het selecteren van een rij spring je naar het
+    spelerprofiel - zelfde klikgedrag op elke pagina die deze helper
+    gebruikt, dus wordt dat maar op één plek onderhouden."""
+    if "player_id" in df.columns:
+        player_ids = df["player_id"].reset_index(drop=True)
+    else:
+        player_ids = pd.Series(df.index, name="player_id").reset_index(drop=True)
+    display = df[list(column_map.keys())].reset_index(drop=True).rename(columns=column_map)
+
+    column_config = {
+        label: st.column_config.ImageColumn(width="small")
+        for label in display.columns
+        if label in ("Logo", "Nat.", "Vlag", "Comp.")
+    }
+    if extra_column_config:
+        column_config.update(extra_column_config)
+
+    event = st.dataframe(
+        display,
+        width="stretch",
+        hide_index=True,
+        height=height or 480,
+        column_config=column_config,
+        on_select="rerun",
+        selection_mode="single-row",
+        key=key,
+    )
+    rows = event.selection.get("rows", []) if event and event.selection else []
+    if rows:
+        st.session_state["jump_to_player_id"] = player_ids.iloc[rows[0]]
+        st.switch_page("pages/3_Spelerprofiel.py")
+
+
 def image_multiselect(label: str, options: list, image_lookups, key_prefix: str, max_shown: int = 150) -> list:
     """Dropdown-achtige multiselect die één of meer échte logo/vlag-
     afbeeldingen naast elke optie toont. Een native <select>/st.multiselect
@@ -327,7 +413,10 @@ def inject_theme() -> None:
         header[data-testid="stHeader"] {background: transparent;}
         div[data-testid="stAppDeployButton"],
         button[data-testid="stMainMenuButton"] {display: none;}
-        .block-container {padding-top: 2rem; max-width: 1200px;}
+        /* Breder dan Streamlit's standaard 730px/1200px: de spelerstabellen
+           hebben veel kolommen en moeten zoveel mogelijk passen zonder dat
+           je horizontaal moet scrollen. */
+        .block-container {padding-top: 2rem; max-width: 1800px;}
         div[data-testid="stMetric"] {
             background: #F0F2F6;
             border: 1px solid #D8DCE3;

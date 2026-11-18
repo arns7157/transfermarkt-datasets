@@ -1,6 +1,7 @@
 import streamlit as st
 
 from utils import (
+    attach_competition_info,
     current_season_appearances,
     image_multiselect,
     inject_theme,
@@ -8,6 +9,8 @@ from utils import (
     load_competitions,
     load_players,
     render_header,
+    render_player_table,
+    truncate_text,
 )
 
 st.set_page_config(page_title="Spelers zoeken", page_icon="🔍", layout="wide")
@@ -17,18 +20,18 @@ players = load_players()
 competitions = load_competitions()
 appearances = load_appearances()
 
-comp_names = competitions.set_index("competition_id")["name"].to_dict()
-comp_countries = competitions.set_index("competition_id")["country"].to_dict()
-players["competition_name"] = players["current_club_domestic_competition_id"].map(comp_names)
-players["country"] = players["current_club_domestic_competition_id"].map(comp_countries)
+players = attach_competition_info(players, competitions)
 
 n_competities = players["current_club_domestic_competition_id"].nunique()
 render_header("Spelers zoeken", f"Filter het volledige spelersbestand van de {n_competities} gevolgde competities.")
 
 season_apps = current_season_appearances(appearances)
-season_matches = season_apps.groupby("player_id").size().rename("matches_this_season")
-players = players.merge(season_matches, left_on="player_id", right_index=True, how="left")
+season_stats = season_apps.groupby("player_id").agg(
+    matches_this_season=("appearance_id", "count"), goals_this_season=("goals", "sum")
+)
+players = players.merge(season_stats, left_on="player_id", right_index=True, how="left")
 players["matches_this_season"] = players["matches_this_season"].fillna(0).astype(int)
+players["goals_this_season"] = players["goals_this_season"].fillna(0).astype(int)
 
 def _image_lookup(col: str, key: str) -> dict:
     return (
@@ -122,68 +125,47 @@ if name_search:
 
 filtered = filtered.sort_values("market_value_in_eur", ascending=False, na_position="last")
 
-st.caption(f"{len(filtered):,} spelers".replace(",", "."))
+st.caption(f"{len(filtered):,} spelers - klik op een rij om naar het spelerprofiel te gaan.".replace(",", "."))
 
-display = filtered[
-    [
-        "club_crest_url",
-        "name",
-        "age",
-        "position",
-        "sub_position",
-        "foot",
-        "current_club_name",
-        "competition_logo_url",
-        "country_flag_url",
-        "country",
-        "competition_name",
-        "matches_this_season",
-        "market_value_m",
-        "contract_expiration_date",
-        "citizenship_flag_url",
-        "country_of_citizenship",
-    ]
-].rename(
-    columns={
+filtered = filtered.copy()
+filtered["name_disp"] = filtered["name"].map(lambda v: truncate_text(v, 20))
+filtered["club_disp"] = filtered["current_club_name"].map(lambda v: truncate_text(v, 16))
+filtered["nationality_disp"] = filtered["country_of_citizenship"].map(lambda v: truncate_text(v, 12))
+
+render_player_table(
+    filtered,
+    {
         "club_crest_url": "Logo",
-        "name": "Naam",
-        "age": "Leeftijd",
+        "name_disp": "Naam",
+        "age": "Lft.",
         "position": "Positie",
-        "sub_position": "Subpositie",
-        "foot": "Voet",
-        "current_club_name": "Club",
-        "competition_logo_url": "Comp.",
-        "country_flag_url": "Vlag",
+        "club_disp": "Club",
+        "competition_display": "Competitie",
         "country": "Land",
-        "competition_name": "Competitie",
-        "matches_this_season": "Wedstrijden (seizoen)",
+        "goals_this_season": "Goals",
+        "matches_this_season": "Wedstrijden",
         "market_value_m": "Marktwaarde (M€)",
         "contract_expiration_date": "Contract tot",
-        "citizenship_flag_url": "Nat.",
-        "country_of_citizenship": "Nationaliteit",
-    }
-)
-
-st.caption("Klik op een rij om naar het spelerprofiel te gaan.")
-event = st.dataframe(
-    display,
-    width="stretch",
-    hide_index=True,
-    height=560,
-    column_config={
-        "Logo": st.column_config.ImageColumn(width="small"),
-        "Comp.": st.column_config.ImageColumn(width="small"),
-        "Vlag": st.column_config.ImageColumn(width="small"),
-        "Nat.": st.column_config.ImageColumn(width="small"),
-        "Marktwaarde (M€)": st.column_config.NumberColumn(format="%.1f"),
-        "Contract tot": st.column_config.DateColumn(format="DD/MM/YYYY"),
+        "nationality_disp": "Nationaliteit",
     },
-    on_select="rerun",
-    selection_mode="single-row",
+    key="spelers_zoeken_table",
+    height=560,
+    extra_column_config={
+        # Exacte pixelbreedtes houden maar als richtwaarde - de harde
+        # cap zit in de getrunceerde tekst zelf (name_disp/club_disp/
+        # competition_display), anders groeit een kolom toch mee met zijn
+        # langste celwaarde en loop je weer tegen horizontaal scrollen aan.
+        "Logo": st.column_config.ImageColumn(width=32),
+        "Naam": st.column_config.TextColumn(width=108),
+        "Lft.": st.column_config.NumberColumn(width=36),
+        "Positie": st.column_config.TextColumn(width=62),
+        "Club": st.column_config.TextColumn(width=92),
+        "Competitie": st.column_config.TextColumn(width=120),
+        "Land": st.column_config.TextColumn(width=50),
+        "Goals": st.column_config.NumberColumn(width=46),
+        "Wedstrijden": st.column_config.NumberColumn(width=82),
+        "Marktwaarde (M€)": st.column_config.NumberColumn(format="%.1f", width=108),
+        "Contract tot": st.column_config.DateColumn(format="DD/MM/YYYY", width=78),
+        "Nationaliteit": st.column_config.TextColumn(width=75),
+    },
 )
-
-selected_rows = event.selection.get("rows", []) if event and event.selection else []
-if selected_rows:
-    clicked_player_id = filtered.iloc[selected_rows[0]]["player_id"]
-    st.session_state["jump_to_player_id"] = clicked_player_id
-    st.switch_page("pages/3_Spelerprofiel.py")
