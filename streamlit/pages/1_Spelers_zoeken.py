@@ -1,6 +1,13 @@
 import streamlit as st
 
-from utils import current_season_appearances, inject_theme, load_appearances, load_competitions, load_players, render_header
+from utils import (
+    current_season_appearances,
+    inject_theme,
+    load_appearances,
+    load_competitions,
+    load_players,
+    render_header,
+)
 
 st.set_page_config(page_title="Spelers zoeken", page_icon="🔍", layout="wide")
 inject_theme()
@@ -22,21 +29,49 @@ season_matches = season_apps.groupby("player_id").size().rename("matches_this_se
 players = players.merge(season_matches, left_on="player_id", right_index=True, how="left")
 players["matches_this_season"] = players["matches_this_season"].fillna(0).astype(int)
 
+def _image_lookup(col: str, key: str) -> dict:
+    return (
+        players.dropna(subset=[col])
+        .loc[lambda d: d[col] != ""]
+        .drop_duplicates(key)
+        .set_index(key)[col]
+        .to_dict()
+    )
+
+
+country_flag_by_name = _image_lookup("country_flag_url", "country")
+comp_logo_by_name = _image_lookup("competition_logo_url", "competition_name")
+club_crest_by_name_local = _image_lookup("club_crest_url", "current_club_name")
+
 with st.sidebar:
     st.header("Filters")
 
+    # Een native multiselect kan geen <img> tonen in zijn opties (enkel
+    # tekst) - vlag-emoji's renderen op Windows/Chromium zonder het juiste
+    # lettertype als een kale lettercode i.p.v. een echte vlag, dus voor
+    # Land/Competitie/Club tonen we i.p.v. daarvan steeds de échte
+    # logo's/vlaggen in een previewrij zodra er iets geselecteerd is.
     country_options = sorted(players["country"].dropna().unique())
     selected_countries = st.multiselect("Land", country_options)
+    country_flags = [country_flag_by_name[c] for c in selected_countries if country_flag_by_name.get(c)]
+    if country_flags:
+        st.image(country_flags, width=28)
 
     country_scoped = players[players["country"].isin(selected_countries)] if selected_countries else players
 
     comp_options = sorted(country_scoped["competition_name"].dropna().unique())
     selected_comps = st.multiselect("Competitie", comp_options)
+    comp_logos = [comp_logo_by_name[c] for c in selected_comps if comp_logo_by_name.get(c)]
+    if comp_logos:
+        st.image(comp_logos, width=28)
 
     scoped = country_scoped[country_scoped["competition_name"].isin(selected_comps)] if selected_comps else country_scoped
 
     club_options = sorted(scoped["current_club_name"].dropna().unique())
     selected_clubs = st.multiselect("Club", club_options)
+    club_crests = [club_crest_by_name_local[c] for c in selected_clubs if club_crest_by_name_local.get(c)]
+    if club_crests:
+        st.image(club_crests, width=28)
 
     position_options = sorted(players["position"].dropna().unique())
     selected_positions = st.multiselect("Positie", position_options)
