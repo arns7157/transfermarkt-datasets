@@ -18,7 +18,7 @@ from utils import (
     position_badge,
     render_header,
     safe_val,
-    style_dark_chart,
+    style_chart,
 )
 
 st.set_page_config(page_title="Spelerprofiel", page_icon="📊", layout="wide")
@@ -101,7 +101,7 @@ else:
         labels={"date": "Datum", "market_value_in_eur": "Marktwaarde (€)", "club_name": "Club"},
     )
     fig.update_traces(line_color="#22C55E", marker_color="#22C55E")
-    style_dark_chart(fig)
+    style_chart(fig)
 
     # Clublogo bij elk punt: welke club de speler was op dat moment.
     # Plotly's layout.image.sizex/sizey willen een kaal getal - op een
@@ -172,7 +172,7 @@ else:
         mode="markers+lines",
         marker_color="#EF4444",
     )
-    style_dark_chart(fig, legend=dict(orientation="h", y=1.1))
+    style_chart(fig, legend=dict(orientation="h", y=1.1))
     st.plotly_chart(fig, width="stretch")
 
     st.subheader("Recente wedstrijden")

@@ -1,10 +1,12 @@
 import ast
+import json
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "csv"
+COMPETITIONS_DIR = Path(__file__).resolve().parent.parent / "data" / "competitions"
 
 POSITION_COLORS = {
     "Goalkeeper": "#F59E0B",
@@ -39,8 +41,31 @@ def _extract_club_name(value):
 
 
 @st.cache_data(ttl=3600)
+def _allowed_competition_ids() -> set:
+    """Competition codes we've actually (re-)scraped under the current
+    batch system (core + big5). Other leagues still show old pre-project
+    data that hasn't been refreshed yet - hidden from the app until their
+    batch has run successfully, then added back."""
+    ids = set()
+    for fname in ("core.json", "big5.json"):
+        fpath = COMPETITIONS_DIR / fname
+        if not fpath.exists():
+            continue
+        with open(fpath, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                code = json.loads(line).get("country_code")
+                if code:
+                    ids.add(code)
+    return ids
+
+
+@st.cache_data(ttl=3600)
 def load_clubs() -> pd.DataFrame:
-    return _read_csv("clubs")
+    df = _read_csv("clubs")
+    return df[df["domestic_competition_id"].isin(_allowed_competition_ids())]
 
 
 @st.cache_data(ttl=3600)
@@ -124,6 +149,7 @@ def club_crest_by_name() -> dict:
 @st.cache_data(ttl=3600)
 def load_players() -> pd.DataFrame:
     df = _read_csv("players")
+    df = df[df["current_club_domestic_competition_id"].isin(_allowed_competition_ids())]
     df["market_value_in_eur"] = pd.to_numeric(df["market_value_in_eur"], errors="coerce")
     df["highest_market_value_in_eur"] = pd.to_numeric(df["highest_market_value_in_eur"], errors="coerce")
     df["date_of_birth"] = pd.to_datetime(df["date_of_birth"], format="%d/%m/%Y", errors="coerce")
@@ -222,21 +248,21 @@ def inline_img(url, height: int = 18) -> str:
     return f'<img src="{url}" height="{height}" style="vertical-align:middle;border-radius:3px;margin-right:4px;">'
 
 
-def style_dark_chart(fig, **extra_layout):
-    """Apply a complete, self-consistent dark style to a Plotly figure.
+def style_chart(fig, **extra_layout):
+    """Apply a complete, self-consistent light style to a Plotly figure.
 
     Setting only plot_bgcolor/paper_bgcolor/font_color leaves sub-elements
     Plotly doesn't inherit that from (hover tooltips, legend swatches) on
-    their light-theme defaults - black text on a near-black background.
-    template='plotly_dark' covers those too; extra_layout can still
+    their dark-theme defaults - white text on a near-white background.
+    template='plotly_white' covers those too; extra_layout can still
     override/add anything (e.g. a custom legend position).
     """
     fig.update_layout(
-        template="plotly_dark",
-        plot_bgcolor="#0B0F14",
-        paper_bgcolor="#0B0F14",
-        font_color="#E5E7EB",
-        hoverlabel=dict(bgcolor="#151B23", font_color="#E5E7EB"),
+        template="plotly_white",
+        plot_bgcolor="#FFFFFF",
+        paper_bgcolor="#FFFFFF",
+        font_color="#31333F",
+        hoverlabel=dict(bgcolor="#F0F2F6", font_color="#31333F"),
         **extra_layout,
     )
     return fig
@@ -256,13 +282,13 @@ def inject_theme() -> None:
         button[data-testid="stMainMenuButton"] {display: none;}
         .block-container {padding-top: 2rem; max-width: 1200px;}
         div[data-testid="stMetric"] {
-            background: #151B23;
-            border: 1px solid #22293380;
+            background: #F0F2F6;
+            border: 1px solid #D8DCE3;
             border-radius: 10px;
             padding: 14px 16px;
         }
         div[data-testid="stMetricValue"] {font-size: 1.6rem;}
-        section[data-testid="stSidebar"] {border-right: 1px solid #222933;}
+        section[data-testid="stSidebar"] {border-right: 1px solid #E5E7EB;}
         .app-header {
             display: flex;
             align-items: baseline;
@@ -270,7 +296,7 @@ def inject_theme() -> None:
             margin-bottom: 0.2rem;
         }
         .app-header h1 {margin: 0; font-size: 1.9rem;}
-        .app-subtitle {color: #8B95A1; font-size: 0.95rem; margin-bottom: 1.4rem;}
+        .app-subtitle {color: #6B7280; font-size: 0.95rem; margin-bottom: 1.4rem;}
         .pill-row {display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px 0;}
         </style>
         """,

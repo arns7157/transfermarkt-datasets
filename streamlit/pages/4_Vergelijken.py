@@ -14,7 +14,7 @@ from utils import (
     player_label,
     render_header,
     safe_val,
-    style_dark_chart,
+    style_chart,
 )
 
 st.set_page_config(page_title="Spelers vergelijken", page_icon="⚖️", layout="wide")
@@ -89,7 +89,7 @@ else:
         labels={"date": "Datum", "market_value_in_eur": "Marktwaarde (€)"},
         color_discrete_sequence=["#22C55E", "#3B82F6", "#F59E0B", "#EF4444"],
     )
-    style_dark_chart(fig)
+    style_chart(fig)
 
     crest_by_name = club_crest_by_name()
     hist_sorted = history.sort_values("date")

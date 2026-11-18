@@ -9,6 +9,7 @@ players = load_players()
 clubs = load_clubs()
 competitions = load_competitions()
 transfers = load_transfers()
+transfers = transfers[transfers["player_id"].isin(players["player_id"])]
 
 n_competities = players["current_club_domestic_competition_id"].nunique()
 
