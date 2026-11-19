@@ -13,7 +13,8 @@ on:
           - core
           - big5
           - eastern_europe
-          - world
+          - world_americas
+          - world_other
           - continental_cups
           - national_teams
 
