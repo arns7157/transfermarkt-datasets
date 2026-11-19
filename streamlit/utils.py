@@ -44,12 +44,13 @@ def _extract_club_name(value):
 @st.cache_data(ttl=3600)
 def _allowed_competition_ids() -> set:
     """Competition codes we've actually (re-)scraped under the current
-    batch system (core + big5 + eastern_europe). Other leagues
-    (continental_cups, national_teams, ...) still show old pre-project
-    data that hasn't been refreshed yet - hidden from the app until their
-    batch has run successfully, then added back."""
+    batch system (core + big5 + eastern_europe + world_other). Other
+    leagues (world_americas, continental_cups, national_teams, ...)
+    still show old pre-project data that hasn't been refreshed yet -
+    hidden from the app until their batch has run successfully, then
+    added back."""
     ids = set()
-    for fname in ("core.json", "big5.json", "eastern_europe.json"):
+    for fname in ("core.json", "big5.json", "eastern_europe.json", "world_other.json"):
         fpath = COMPETITIONS_DIR / fname
         if not fpath.exists():
             continue
