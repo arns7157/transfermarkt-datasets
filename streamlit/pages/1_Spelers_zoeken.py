@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 from utils import (
@@ -8,6 +9,7 @@ from utils import (
     load_appearances,
     load_competitions,
     load_players,
+    load_transfers,
     render_header,
     render_player_table,
     truncate_text,
@@ -19,8 +21,25 @@ inject_theme()
 players = load_players()
 competitions = load_competitions()
 appearances = load_appearances()
+transfers = load_transfers()
 
 players = attach_competition_info(players, competitions)
+
+# Laatste transfer per speler, enkel als waarschuwing als die recent is -
+# anders lijkt een speler soms "niets gepresteerd" terwijl hij net van
+# club wisselde en nog geen wedstrijd voor zijn nieuwe club speelde.
+latest_transfer = transfers.sort_values("transfer_date", ascending=False).drop_duplicates("player_id")
+now = pd.Timestamp.now()
+recent_cutoff = now - pd.Timedelta(days=90)
+# <= now uitsluiten van toekomstige datums: transfers.csv bevat af en toe
+# een foutieve datum ver in de toekomst (vermoedelijk een verwisselde
+# contract-einddatum), die anders ook als "recent" zou meetellen.
+recent_transfer_ids = set(
+    latest_transfer.loc[
+        latest_transfer["transfer_date"].between(recent_cutoff, now), "player_id"
+    ]
+)
+players["transfer_marker"] = players["player_id"].map(lambda pid: "⚠️" if pid in recent_transfer_ids else "")
 
 n_competities = players["current_club_domestic_competition_id"].nunique()
 render_header("Spelers zoeken", f"Filter het volledige spelersbestand van de {n_competities} gevolgde competities.")
@@ -139,6 +158,7 @@ render_player_table(
         "name_disp": "Naam",
         "age": "Lft.",
         "position": "Positie",
+        "transfer_marker": "Transfer",
         "club_disp": "Club",
         "competition_display": "Competitie",
         "country": "Land",
@@ -159,6 +179,7 @@ render_player_table(
         "Naam": st.column_config.TextColumn(width=108),
         "Lft.": st.column_config.NumberColumn(width=36),
         "Positie": st.column_config.TextColumn(width=62),
+        "Transfer": st.column_config.TextColumn(width=32, help="⚠️ = binnen de laatste 90 dagen getransfereerd"),
         "Club": st.column_config.TextColumn(width=92),
         "Competitie": st.column_config.TextColumn(width=120),
         "Land": st.column_config.TextColumn(width=50),

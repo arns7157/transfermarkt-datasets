@@ -20,6 +20,7 @@ from utils import (
     render_header,
     safe_val,
     style_chart,
+    transfer_badge_html,
 )
 
 st.set_page_config(page_title="Spelerprofiel", page_icon="📊", layout="wide")
@@ -59,6 +60,7 @@ selected_id = st.selectbox(
     format_func=lambda pid: labels.get(pid, str(pid)),
 )
 player = players[players["player_id"] == selected_id].iloc[0]
+player_transfers = transfers[transfers["player_id"] == selected_id].sort_values("transfer_date", ascending=False)
 
 col_img, col_info = st.columns([1, 3])
 with col_img:
@@ -67,6 +69,9 @@ with col_img:
 with col_info:
     st.subheader(player["name"])
     st.markdown(position_badge(player.get("position")), unsafe_allow_html=True)
+    badge = transfer_badge_html(player_transfers)
+    if badge:
+        st.markdown(badge, unsafe_allow_html=True)
     st.write("")
     contract = player.get("contract_expiration_date")
     contract_str = contract.strftime("%d/%m/%Y") if contract is not None and not isinstance(contract, float) else "–"
@@ -195,7 +200,6 @@ else:
 
 st.divider()
 st.subheader("Transferhistorie")
-player_transfers = transfers[transfers["player_id"] == selected_id].sort_values("transfer_date", ascending=False)
 if player_transfers.empty:
     st.info("Geen transfers geregistreerd voor deze speler.")
 else:

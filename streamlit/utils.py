@@ -403,6 +403,48 @@ def inline_img(url, height: int = 18) -> str:
     return f'<img src="{url}" height="{height}" style="vertical-align:middle;border-radius:3px;margin-right:4px;">'
 
 
+def recent_transfer(player_transfers: pd.DataFrame, within_days: int = 90):
+    """Meest recente transfer van deze speler, als die binnen within_days
+    valt - anders None. player_transfers moet al tot één speler herleid
+    zijn en een transfer_date-kolom hebben (van/naar hoeft niet gesorteerd
+    te zijn, dat doet deze functie zelf)."""
+    if player_transfers.empty:
+        return None
+    latest = player_transfers.sort_values("transfer_date", ascending=False).iloc[0]
+    date = latest.get("transfer_date")
+    if pd.isna(date):
+        return None
+    days_ago = (pd.Timestamp.now() - date).days
+    # transfers.csv bevat af en toe een foutieve datum ver in de toekomst
+    # (jaar 2028/3026, vermoedelijk een contract-einddatum die per
+    # vergissing als transfer_date terechtkwam) - zo'n datum geeft een
+    # NEGATIEF aantal dagen geleden, wat anders als "recent" doorglipt.
+    if days_ago < 0 or days_ago > within_days:
+        return None
+    return latest
+
+
+def transfer_badge_html(player_transfers: pd.DataFrame, within_days: int = 90) -> str:
+    """Badge met waarschuwingsicoon - toont bij hover de 2 clubs (met logo)
+    en de datum van de transfer. Lege string als er geen recente transfer
+    is, zodat callers dit onvoorwaardelijk in st.markdown kunnen plakken."""
+    latest = recent_transfer(player_transfers, within_days)
+    if latest is None:
+        return ""
+    date = latest["transfer_date"]
+    from_crest = inline_img(latest.get("from_club_crest_url"), height=20)
+    to_crest = inline_img(latest.get("to_club_crest_url"), height=20)
+    from_name = safe_val(latest.get("from_club_name"), "onbekend")
+    to_name = safe_val(latest.get("to_club_name"), "onbekend")
+    return (
+        '<span class="transfer-badge">⚠️ Net getransfereerd'
+        '<span class="transfer-tooltip">'
+        f"{from_crest}{from_name} &nbsp;→&nbsp; {to_crest}{to_name}<br>"
+        f"{date:%d/%m/%Y}"
+        "</span></span>"
+    )
+
+
 def style_chart(fig, **extra_layout):
     """Apply a complete, self-consistent light style to a Plotly figure.
 
@@ -471,6 +513,41 @@ def inject_theme() -> None:
         div[data-testid="stPopoverBody"] div[data-testid="stElementToolbar"] {display: none;}
         div[data-testid="stPopoverBody"] div[data-testid="stImageContainer"] img {border-radius: 3px;}
         div[data-testid="stPopoverBody"] label[data-testid="stWidgetLabel"] p {font-size: 0.92rem;}
+        /* transfer_badge_html(): klein label met een pure-CSS hover-tooltip
+           (geen widget nodig, dus werkt ook binnen st.markdown) - de tooltip
+           zelf staat standaard verborgen en verschijnt enkel on :hover. */
+        .transfer-badge {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #FEF3C7;
+            color: #92400E;
+            border: 1px solid #FDE68A;
+            border-radius: 999px;
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: default;
+            margin-bottom: 12px;
+        }
+        .transfer-badge .transfer-tooltip {
+            display: none;
+            position: absolute;
+            top: 130%;
+            left: 0;
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 10px 14px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+            white-space: nowrap;
+            font-weight: 400;
+            font-size: 0.85rem;
+            color: #31333F;
+            z-index: 50;
+        }
+        .transfer-badge:hover .transfer-tooltip {display: block;}
         </style>
         """,
         unsafe_allow_html=True,
