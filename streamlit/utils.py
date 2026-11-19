@@ -490,7 +490,14 @@ def render_header(title: str, subtitle: str = "") -> None:
 
 def current_season_appearances(appearances: pd.DataFrame) -> pd.DataFrame:
     """appearances.csv holds every season back to ~2014 - most 'this season'
-    views should only look at matches from the current season onward."""
+    views should only look at matches from the current season onward.
+
+    Seizoensgrens bewust op de meest recente datum van het DOORGEGEVEN
+    subset, niet op de volledige dataset: voor een pas getransfereerde
+    speler (bv. net overgekomen uit Brazilië, nog geen wedstrijd bij zijn
+    nieuwe club) toont dit dan nog zijn laatst gespeelde periode i.p.v.
+    een kaal "0 wedstrijden" - minder letterlijk, maar minder verwarrend
+    dan een actieve speler laten lijken alsof hij niets gedaan heeft."""
     dated = appearances.dropna(subset=["date"])
     if dated.empty:
         return dated
