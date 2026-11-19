@@ -149,10 +149,71 @@ def club_crest_by_name() -> dict:
     return clubs.dropna(subset=["crest_url"]).drop_duplicates("name").set_index("name")["crest_url"].to_dict()
 
 
+_CLUB_NAME_STOPWORDS = {
+    "fc", "cf", "sc", "ac", "afc", "cd", "ud", "sv", "sk", "bk", "if", "hk", "ec", "ca", "cp",
+    "real", "club", "united", "city", "town", "athletic", "atletico", "deportivo", "sporting",
+    "olympique", "dynamo", "dinamo", "inter", "international", "national", "nacional",
+    "de", "do", "la", "le", "1", "1.",
+}
+
+
+def _name_tokens(name: str) -> set:
+    words = re.findall(r"[a-z0-9]+", str(name).lower())
+    return {w for w in words if len(w) >= 4 and w not in _CLUB_NAME_STOPWORDS}
+
+
+@st.cache_data(ttl=3600)
+def _stale_transferred_away_ids() -> set:
+    """player_id's die volgens hun eigen transferhistorie naar een club
+    buiten alle gevolgde competities zijn vertrokken.
+
+    players.csv' current_club-veld wordt enkel ververst zolang een speler
+    in het kader van een gevolgde club opduikt - vertrekt hij daarbuiten
+    (bv. naar Brazilië, dat nog niet gescraped is), dan blijft dat veld
+    voor altijd op zijn laatste gekende (wél gevolgde) club staan, terwijl
+    transfers.csv (een losse, speler-specifieke API-call, niet afhankelijk
+    van kaderlijsten) wél gewoon de echte, nieuwe club toont. Die twee
+    tonen dan tegenstrijdige info (club zegt A, transferhistorie zegt B) -
+    zo'n speler eruit filteren is minder verwarrend dan hem met half-juiste
+    data te tonen.
+
+    to_club_id/to_club_crest_url zijn voor de meeste transfers leeg (enkel
+    recent ingevulde rijen hebben ze), en to_club_name is vaak een
+    afkorting ("Man City", "Dortmund") die nooit letterlijk matcht met
+    clubs.csv' volledige naam ("Manchester City", "Borussia Dortmund") -
+    vandaar matching op gedeelde naam-tokens i.p.v. exacte match/ID, met
+    een stopwoordenlijst voor generieke clubwoorden. Bij twijfel (geen
+    bruikbare tokens, bv. "Man City" zonder "City" als stopwoord) NIET
+    uitfilteren - een speler onterecht tonen is minder erg dan hem
+    onterecht laten verdwijnen."""
+    transfers = load_transfers()
+    dated = transfers.dropna(subset=["transfer_date"])
+    now = pd.Timestamp.now()
+    # Dezelfde foutieve toekomst-datums als bij de "net getransfereerd"-badge.
+    dated = dated[dated["transfer_date"] <= now]
+    if dated.empty:
+        return set()
+    latest = dated.sort_values("transfer_date").drop_duplicates("player_id", keep="last")
+
+    tracked_tokens = set()
+    for name in load_clubs()["name"]:
+        tracked_tokens |= _name_tokens(name)
+
+    def moved_to_untracked_club(to_name) -> bool:
+        tokens = _name_tokens(to_name)
+        if not tokens:
+            return False
+        return tokens.isdisjoint(tracked_tokens)
+
+    moved_away = latest[latest["to_club_name"].map(moved_to_untracked_club)]
+    return set(moved_away["player_id"])
+
+
 @st.cache_data(ttl=3600)
 def load_players() -> pd.DataFrame:
     df = _read_csv("players")
     df = df[df["current_club_domestic_competition_id"].isin(_allowed_competition_ids())]
+    df = df[~df["player_id"].isin(_stale_transferred_away_ids())]
     df["market_value_in_eur"] = pd.to_numeric(df["market_value_in_eur"], errors="coerce")
     df["highest_market_value_in_eur"] = pd.to_numeric(df["highest_market_value_in_eur"], errors="coerce")
     df["date_of_birth"] = pd.to_datetime(df["date_of_birth"], format="%d/%m/%Y", errors="coerce")
