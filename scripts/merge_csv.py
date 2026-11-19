@@ -379,6 +379,18 @@ def merge():
                 w.writerow({k: row.get(k, '') for k in all_app_cols})
         print(f'appearances.csv: {len(merged_apps)} rijen (was {len(existing_apps)}, +{len(merged_apps)-len(existing_apps)} nieuw)')
     # ── WEDSTRIJDEN ──
+    def parse_attendance(raw):
+        """'Attendance: 5.582' -> 5582. TM gebruikt de punt als
+        duizendtal-scheiding, geen decimalen bij een toeschouwersaantal."""
+        if not raw:
+            return ''
+        s = re.sub(r'(?i)attendance:\s*', '', str(raw)).strip()
+        s = s.replace('.', '').replace(',', '')
+        try:
+            return int(s)
+        except (TypeError, ValueError):
+            return ''
+
     games = load_jsonl(RAW / 'games.json')
     print(f"Games geladen: {len(games)}")
     new_game_rows = []
@@ -389,6 +401,7 @@ def merge():
                 'competition_id':  g.get('competition_id', ''),
                 'season':          g.get('season', ''),
                 'date':            g.get('date', ''),
+                'matchday':        g.get('matchday', ''),
                 'home_club_id':    g.get('home_club_id', ''),
                 'away_club_id':    g.get('away_club_id', ''),
                 'home_club_goals': g.get('home_club_goals', ''),
@@ -396,7 +409,10 @@ def merge():
                 'home_club_name':  g.get('home_club_name', ''),
                 'away_club_name':  g.get('away_club_name', ''),
                 'stadium':         g.get('stadium', ''),
-                'attendance':      g.get('attendance', ''),
+                'attendance':      parse_attendance(g.get('attendance', '')),
+                'referee':         g.get('referee', ''),
+                'home_manager_name': g.get('home_manager_name', ''),
+                'away_manager_name': g.get('away_manager_name', ''),
                 'url':             g.get('url', ''),
             })
         else:
@@ -409,31 +425,64 @@ def merge():
             away_id = extract_id((g.get('away_club') or {}).get('href', ''))
             comp_id = (g.get('parent') or {}).get('country_code', '') or                   extract_id((g.get('parent') or {}).get('href', ''))
             game_id = g.get('game_id', '') or extract_id(g.get('href', ''))
+            # PATCH: games.py geeft nooit een kant-en-klare home/away_club_name
+            # mee (enkel een href) - club_id_map (hierboven opgebouwd uit
+            # clubs.json, inclusief alle al eerder gekende clubs) is de
+            # bron die wel een naam heeft. Zonder dit bleef dit veld bij elke
+            # nieuwe wedstrijd leeg (bevestigd: ~37% van games.csv vóór deze fix).
+            home_name = g.get('home_club_name', '') or club_id_map.get(str(home_id), {}).get('name', '')
+            away_name = g.get('away_club_name', '') or club_id_map.get(str(away_id), {}).get('name', '')
+            home_manager_names = g.get('home_manager') or {}
+            away_manager_names = g.get('away_manager') or {}
             new_game_rows.append({
                 'game_id':         game_id,
                 'competition_id':  comp_id,
                 'season':          g.get('season', '2025'),
                 'date':            g.get('date', ''),
+                'matchday':        g.get('matchday', ''),
                 'home_club_id':    home_id,
                 'away_club_id':    away_id,
                 'home_club_goals': home_goals,
                 'away_club_goals': away_goals,
-                'home_club_name':  g.get('home_club_name', ''),
-                'away_club_name':  g.get('away_club_name', ''),
+                'home_club_name':  home_name,
+                'away_club_name':  away_name,
                 'stadium':         g.get('stadium', ''),
-                'attendance':      g.get('attendance', ''),
+                'attendance':      parse_attendance(g.get('attendance', '')),
+                'referee':         g.get('referee', ''),
+                'home_manager_name': home_manager_names.get('name', ''),
+                'away_manager_name': away_manager_names.get('name', ''),
                 'url':             f"https://www.transfermarkt.co.uk{g.get('href', '')}",
             })
     existing_games = load_csv_existing(OUT / 'games.csv')
     game_id_map = {r['game_id']: r for r in existing_games if r.get('game_id')}
     for r in new_game_rows:
-        if r['game_id']:
-            game_id_map[str(r['game_id'])] = r
+        gid = str(r.get('game_id', ''))
+        if not gid:
+            continue
+        old_row = game_id_map.get(gid)
+        if old_row:
+            # Bewaar wat een eerdere run al kende als deze run het (nog)
+            # niet kon vinden - zelfde upsert-aanpak als overal elders.
+            for keep_col in [
+                'home_club_name', 'away_club_name', 'matchday', 'referee',
+                'home_manager_name', 'away_manager_name', 'attendance', 'stadium',
+            ]:
+                if not r.get(keep_col) and old_row.get(keep_col):
+                    r[keep_col] = old_row[keep_col]
+        game_id_map[gid] = r
     merged_games = list(game_id_map.values())
     if merged_games:
+        game_cols = [
+            'game_id', 'competition_id', 'season', 'date', 'matchday',
+            'home_club_id', 'away_club_id', 'home_club_goals', 'away_club_goals',
+            'home_club_name', 'away_club_name', 'stadium', 'attendance',
+            'referee', 'home_manager_name', 'away_manager_name', 'url',
+        ]
         with open(OUT / 'games.csv', 'w', newline='', encoding='utf-8') as f:
-            w = csv.DictWriter(f, fieldnames=list(merged_games[0].keys()))
-            w.writeheader(); w.writerows(merged_games)
+            w = csv.DictWriter(f, fieldnames=game_cols, extrasaction='ignore')
+            w.writeheader()
+            for row in merged_games:
+                w.writerow({k: row.get(k, '') for k in game_cols})
         print(f'games.csv: {len(merged_games)} rijen (was {len(existing_games)}, +{len(merged_games)-len(existing_games)} nieuw)')
     def _fix_encoding(s):
         if not s: return s
