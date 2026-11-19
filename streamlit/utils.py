@@ -195,6 +195,26 @@ def load_appearances() -> pd.DataFrame:
     return df
 
 
+_INJURY_COLUMNS = ["injury_id", "player_id", "season", "injury", "from_date", "until_date", "days", "games_missed"]
+
+
+@st.cache_data(ttl=3600)
+def load_injuries() -> pd.DataFrame:
+    """Blessurehistoriek per speler. injuries.csv.gz bestaat pas na de
+    eerste scrape-run die de nieuwe 'injuries'-stap meeneemt - geeft tot
+    dan een lege (maar correct gekolomde) dataframe terug i.p.v. te
+    crashen op een ontbrekend bestand."""
+    fpath = DATA_DIR / "injuries.csv.gz"
+    if not fpath.exists():
+        return pd.DataFrame(columns=_INJURY_COLUMNS)
+    df = _read_csv("injuries")
+    df["from_date"] = pd.to_datetime(df["from_date"], format="%d/%m/%Y", errors="coerce")
+    df["until_date"] = pd.to_datetime(df["until_date"], format="%d/%m/%Y", errors="coerce")
+    df["days"] = pd.to_numeric(df["days"], errors="coerce")
+    df["games_missed"] = pd.to_numeric(df["games_missed"], errors="coerce").fillna(0).astype(int)
+    return df
+
+
 def format_money(value) -> str:
     if pd.isna(value):
         return "–"

@@ -389,6 +389,19 @@ jobs:
           PYEOF
           echo "Valuations: $(wc -l < $GITHUB_WORKSPACE/data/raw/valuations.json 2>/dev/null || echo 0)"
 
+      - name: Stap 2e - Blessures scrapen
+        timeout-minutes: 60
+        continue-on-error: true
+        run: |
+          cd /tmp/scraper
+          # Blessurehistoriek is een carrière-overzicht, geen seizoensgebonden
+          # pagina - één keer ophalen per speler volstaat, geen seizoen-loop.
+          python3 -m scrapy crawl injuries \
+            -a parents=$GITHUB_WORKSPACE/data/raw/players.json \
+            -a season=$CURRENT_SEASON \
+            >> $GITHUB_WORKSPACE/data/raw/injuries.json || true
+          echo "Blessures nieuw: $(wc -l < $GITHUB_WORKSPACE/data/raw/injuries.json 2>/dev/null || echo 0)"
+
       - name: Stap 3 - Optredens ophalen via API
         timeout-minutes: 120
         continue-on-error: true

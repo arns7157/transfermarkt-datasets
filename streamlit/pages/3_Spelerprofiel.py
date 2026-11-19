@@ -11,6 +11,7 @@ from utils import (
     inject_theme,
     inline_img,
     load_appearances,
+    load_injuries,
     load_players,
     load_transfers,
     load_valuations,
@@ -29,6 +30,7 @@ players = load_players().sort_values("name")
 appearances = load_appearances()
 transfers = load_transfers()
 valuations = load_valuations()
+injuries = load_injuries()
 
 labels = {pid: player_label(row) for pid, row in zip(players["player_id"], players.to_dict("records"))}
 
@@ -222,5 +224,27 @@ else:
             "Datum": st.column_config.DateColumn(format="DD/MM/YYYY"),
             "Logo (van)": st.column_config.ImageColumn(width="small"),
             "Logo (naar)": st.column_config.ImageColumn(width="small"),
+        },
+    )
+
+st.divider()
+st.subheader("Blessurehistorie")
+player_injuries = injuries[injuries["player_id"] == selected_id].sort_values("from_date", ascending=False)
+if player_injuries.empty:
+    st.info("Geen blessures geregistreerd voor deze speler.")
+else:
+    today = pd.Timestamp.now().normalize()
+    ongoing = player_injuries["until_date"].isna() | (player_injuries["until_date"] >= today)
+    if ongoing.any() and player_injuries.loc[ongoing, "from_date"].max() >= today - pd.Timedelta(days=120):
+        st.warning("Heeft recent een blessure zonder (bevestigde) terugkeerdatum - mogelijk nog altijd geblesseerd.")
+    idisp = player_injuries[["season", "injury", "from_date", "until_date", "days", "games_missed"]].copy()
+    idisp.columns = ["Seizoen", "Blessure", "Vanaf", "Tot", "Dagen", "Wedstrijden gemist"]
+    st.dataframe(
+        idisp,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Vanaf": st.column_config.DateColumn(format="DD/MM/YYYY"),
+            "Tot": st.column_config.DateColumn(format="DD/MM/YYYY"),
         },
     )

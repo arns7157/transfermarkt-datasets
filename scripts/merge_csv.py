@@ -540,6 +540,50 @@ def merge():
             w = csv.DictWriter(f, fieldnames=list(merged_vals[0].keys()))
             w.writeheader(); w.writerows(merged_vals)
         print(f'player_valuations.csv: {len(merged_vals)} rijen (was {len(existing_vals)}, +{len(merged_vals)-len(existing_vals)} nieuw)')
+    # ── BLESSURES ──
+    injuries_raw = load_jsonl(RAW / 'injuries.json')
+    new_injury_rows = []
+    for inj in injuries_raw:
+        parent = inj.get('parent') or {}
+        player_id = extract_id(parent.get('href', ''))
+        days_match = re.search(r'(\d+)', inj.get('days', '') or '')
+        days = int(days_match.group(1)) if days_match else ''
+        try:
+            games_missed = int(inj.get('games_missed', '') or 0)
+        except (TypeError, ValueError):
+            games_missed = 0
+        season = inj.get('season', '') or ''
+        from_date = inj.get('from_date', '') or ''
+        injury_name = inj.get('injury', '') or ''
+        # Geen natuurlijke unieke id op TM zelf - player+season+from_date+
+        # blessurenaam ligt in de praktijk vast (een speler loopt niet twee
+        # keer dezelfde blessure op dezelfde dag op).
+        slug = re.sub(r'[^a-z0-9]+', '', injury_name.lower())
+        injury_id = f"{player_id}_{season}_{from_date.replace('/', '')}_{slug}" if player_id else ''
+        new_injury_rows.append({
+            'injury_id': injury_id,
+            'player_id': player_id,
+            'season': season,
+            'injury': injury_name,
+            'from_date': from_date,
+            'until_date': inj.get('until_date', '') or '',
+            'days': days,
+            'games_missed': games_missed,
+        })
+    existing_injuries = load_csv_existing(OUT / 'injuries.csv')
+    injury_id_map = {r['injury_id']: r for r in existing_injuries if r.get('injury_id')}
+    for r in new_injury_rows:
+        if r['injury_id']:
+            injury_id_map[r['injury_id']] = r
+    merged_injuries = list(injury_id_map.values())
+    if merged_injuries:
+        injury_cols = ['injury_id', 'player_id', 'season', 'injury', 'from_date', 'until_date', 'days', 'games_missed']
+        with open(OUT / 'injuries.csv', 'w', newline='', encoding='utf-8') as f:
+            w = csv.DictWriter(f, fieldnames=injury_cols, extrasaction='ignore')
+            w.writeheader()
+            for row in merged_injuries:
+                w.writerow({k: row.get(k, '') for k in injury_cols})
+        print(f'injuries.csv: {len(merged_injuries)} rijen (was {len(existing_injuries)}, +{len(merged_injuries)-len(existing_injuries)} nieuw)')
     tmp = Path('data/csv/appearances_existing.csv')
     if tmp.exists(): tmp.unlink()
     print('Conversie en samenvoegen klaar!')

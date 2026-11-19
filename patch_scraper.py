@@ -683,6 +683,75 @@ def patch_games_fallback():
     return True
 
 
+def add_injuries_spider():
+    """Voegt een nieuwe 'injuries'-spider toe aan de gecloonde scraper.
+
+    Bestaat niet upstream - transfermarkt-scraper haalt enkel bio/
+    appearances/games/competities op, nooit blessurehistoriek. De
+    blessurepagina (<speler-href>/verletzungen/spieler/<id>, met
+    '/profil/spieler/' vervangen door '/verletzungen/spieler/') heeft
+    dezelfde 'table.items'-opbouw als de rest van Transfermarkt:
+    Season | Injury | from | until | Days | Games missed. De laatste
+    kolom bevat een club/land-wapen plus een <span> met het aantal
+    gemiste wedstrijden, of een kale "-" als er geen wedstrijden gemist
+    zijn (bv. een blessure die net na het seizoen begon).
+
+    Draait tegen data/raw/players.json als parents (één keer, niet per
+    seizoen - de pagina toont sowieso de volledige carrière-historiek).
+    """
+    fpath = SCRAPER_DIR / 'tfmkt' / 'spiders' / 'injuries.py'
+    fpath.write_text(
+        "from tfmkt.spiders.common import BaseSpider\n"
+        "\n"
+        "class InjuriesSpider(BaseSpider):\n"
+        "  name = 'injuries'\n"
+        "\n"
+        "  def parse(self, response, parent):\n"
+        "    \"\"\"Van de spelerspagina door naar de blessurehistoriek-pagina.\n"
+        "\n"
+        "    @url https://www.transfermarkt.co.uk/erling-haaland/profil/spieler/418560\n"
+        "    @returns requests 1 1\n"
+        "    @cb_kwargs {\"parent\": \"dummy\"}\n"
+        "    \"\"\"\n"
+        "    injury_href = parent['href'].replace('/profil/spieler/', '/verletzungen/spieler/')\n"
+        "    yield response.follow(injury_href, self.parse_injuries, cb_kwargs={'parent': parent})\n"
+        "\n"
+        "  def parse_injuries(self, response, parent):\n"
+        "    \"\"\"Parse de blessuretabel.\n"
+        "\n"
+        "    @url https://www.transfermarkt.co.uk/erling-haaland/verletzungen/spieler/418560\n"
+        "    @returns items 0 50\n"
+        "    @cb_kwargs {\"parent\": {\"href\": \"some_href\", \"type\": \"player\", \"parent\": {}}}\n"
+        "    @scrapes type parent season injury from_date until_date days games_missed\n"
+        "    \"\"\"\n"
+        "    tables = response.css('table.items')\n"
+        "    if not tables:\n"
+        "      self.logger.info('injuries: geen blessuretabel op %s (speler nooit geblesseerd of pagina leeg)', response.url)\n"
+        "      return\n"
+        "\n"
+        "    for row in tables[0].css('tr'):\n"
+        "      cells = row.css('td')\n"
+        "      if len(cells) < 6:\n"
+        "        continue  # header-rij of onverwachte structuur\n"
+        "\n"
+        "      games_missed = self.safe_strip(cells[5].css('span::text').get())\n"
+        "\n"
+        "      yield {\n"
+        "        'type': 'injury',\n"
+        "        'parent': parent,\n"
+        "        'season': self.safe_strip(cells[0].css('::text').get()),\n"
+        "        'injury': self.safe_strip(cells[1].css('::text').get()),\n"
+        "        'from_date': self.safe_strip(cells[2].css('::text').get()),\n"
+        "        'until_date': self.safe_strip(cells[3].css('::text').get()),\n"
+        "        'days': self.safe_strip(cells[4].css('::text').get()),\n"
+        "        'games_missed': games_missed if games_missed else '0',\n"
+        "      }\n",
+        encoding='utf-8',
+    )
+    print("  ✅ injuries.py: nieuwe spider aangemaakt")
+    return True
+
+
 def main():
     print("=== Scraper patch script ===")
     print(f"Scraper directory: {SCRAPER_DIR}")
@@ -702,6 +771,7 @@ def main():
     patch_common()
     patch_club_tiers()
     patch_games_fallback()
+    add_injuries_spider()
     print("=== Patches klaar ===")
 
 
