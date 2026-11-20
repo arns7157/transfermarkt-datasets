@@ -1,4 +1,5 @@
 import ast
+import base64
 import json
 import re
 from pathlib import Path
@@ -8,6 +9,7 @@ import streamlit as st
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "csv"
 COMPETITIONS_DIR = Path(__file__).resolve().parent.parent / "data" / "competitions"
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
 POSITION_COLORS = {
     "Goalkeeper": "#F59E0B",
@@ -455,6 +457,23 @@ def safe_val(value, default="–"):
     return value
 
 
+@st.cache_data(ttl=None)
+def _asset_data_uri(filename: str) -> str:
+    """Embed a local streamlit/assets/ image as a base64 data: URI - needed
+    because st.column_config.ImageColumn and st.markdown's <img src=...> both
+    need a browser-resolvable URL, and a plain local file path doesn't work
+    (the browser, not this process, loads it) and this app doesn't have
+    static file serving enabled."""
+    path = ASSETS_DIR / filename
+    mime = "image/webp" if path.suffix == ".webp" else "image/png"
+    data = path.read_bytes()
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def injury_icon_url() -> str:
+    return _asset_data_uri("injury_icon.webp")
+
+
 def inline_img(url, height: int = 18) -> str:
     """Small inline <img> tag for use inside st.markdown(unsafe_allow_html=True),
     e.g. next to a club/competition/country name. Returns '' for a missing URL
@@ -551,8 +570,9 @@ def injury_badge_html(player_injuries: pd.DataFrame) -> str:
     name = safe_val(injury.get("injury"), "onbekende blessure")
     until = injury.get("until_date")
     until_str = f"verwacht terug op {until:%d/%m/%Y}" if pd.notna(until) else "nog geen terugkeerdatum"
+    icon = inline_img(injury_icon_url(), height=16)
     return (
-        '<span class="injury-badge">❌ Geblesseerd'
+        f'<span class="injury-badge">{icon}Geblesseerd'
         '<span class="injury-tooltip">'
         f"{name}<br>sinds {injury['from_date']:%d/%m/%Y} ({until_str})"
         "</span></span>"

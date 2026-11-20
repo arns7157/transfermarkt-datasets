@@ -7,6 +7,7 @@ from utils import (
     currently_injured_ids,
     image_multiselect,
     inject_theme,
+    injury_icon_url,
     load_appearances,
     load_competitions,
     load_injuries,
@@ -152,11 +153,10 @@ st.caption(f"{len(filtered):,} spelers - klik op een rij om naar het spelerprofi
 
 filtered = filtered.copy()
 filtered["name_disp"] = filtered["name"].map(lambda v: truncate_text(v, 20))
-# Rood kruisje vóór de naam voor een speler met een lopende blessure - in de
-# naam-kolom zelf i.p.v. een eigen kolom, zodat het echt "voor zijn naam"
-# staat i.p.v. ergens anders in de rij.
-injured_mask = filtered["player_id"].isin(injured_ids)
-filtered.loc[injured_mask, "name_disp"] = "❌ " + filtered.loc[injured_mask, "name_disp"]
+# Eigen beeldkolom vlak vóór Naam i.p.v. tekst in de naam zelf - een
+# TextColumn kan geen tekst+afbeelding combineren in 1 cel.
+_injury_icon = injury_icon_url()
+filtered["injury_marker"] = filtered["player_id"].map(lambda pid: _injury_icon if pid in injured_ids else "")
 filtered["club_disp"] = filtered["current_club_name"].map(lambda v: truncate_text(v, 16))
 filtered["nationality_disp"] = filtered["country_of_citizenship"].map(lambda v: truncate_text(v, 12))
 
@@ -164,6 +164,7 @@ render_player_table(
     filtered,
     {
         "club_crest_url": "Logo",
+        "injury_marker": "Blessure",
         "name_disp": "Naam",
         "age": "Lft.",
         "position": "Positie",
@@ -185,7 +186,8 @@ render_player_table(
         # competition_display), anders groeit een kolom toch mee met zijn
         # langste celwaarde en loop je weer tegen horizontaal scrollen aan.
         "Logo": st.column_config.ImageColumn(width=32),
-        "Naam": st.column_config.TextColumn(width=108, help="❌ voor de naam = momenteel geblesseerd"),
+        "Blessure": st.column_config.ImageColumn(width=28, help="Speler heeft momenteel een blessure"),
+        "Naam": st.column_config.TextColumn(width=108),
         "Lft.": st.column_config.NumberColumn(width=36),
         "Positie": st.column_config.TextColumn(width=62),
         "Transfer": st.column_config.TextColumn(width=32, help="⚠️ = binnen de laatste 90 dagen getransfereerd"),
