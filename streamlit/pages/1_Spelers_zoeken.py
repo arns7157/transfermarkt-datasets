@@ -7,7 +7,7 @@ from utils import (
     currently_injured_ids,
     image_multiselect,
     inject_theme,
-    injury_icon_url,
+    injury_icon_small_url,
     load_appearances,
     load_competitions,
     load_injuries,
@@ -15,6 +15,7 @@ from utils import (
     load_transfers,
     render_header,
     render_player_table,
+    transfer_icon_small_url,
     truncate_text,
 )
 
@@ -44,7 +45,8 @@ recent_transfer_ids = set(
         latest_transfer["transfer_date"].between(recent_cutoff, now), "player_id"
     ]
 )
-players["transfer_marker"] = players["player_id"].map(lambda pid: "⚠️" if pid in recent_transfer_ids else "")
+_transfer_icon = transfer_icon_small_url()
+players["transfer_marker"] = players["player_id"].map(lambda pid: _transfer_icon if pid in recent_transfer_ids else "")
 
 n_competities = players["current_club_domestic_competition_id"].nunique()
 render_header("Spelers zoeken", f"Filter het volledige spelersbestand van de {n_competities} gevolgde competities.")
@@ -155,7 +157,7 @@ filtered = filtered.copy()
 filtered["name_disp"] = filtered["name"].map(lambda v: truncate_text(v, 20))
 # Eigen beeldkolom vlak vóór Naam i.p.v. tekst in de naam zelf - een
 # TextColumn kan geen tekst+afbeelding combineren in 1 cel.
-_injury_icon = injury_icon_url()
+_injury_icon = injury_icon_small_url()
 filtered["injury_marker"] = filtered["player_id"].map(lambda pid: _injury_icon if pid in injured_ids else "")
 filtered["club_disp"] = filtered["current_club_name"].map(lambda v: truncate_text(v, 16))
 filtered["nationality_disp"] = filtered["country_of_citizenship"].map(lambda v: truncate_text(v, 12))
@@ -186,11 +188,11 @@ render_player_table(
         # competition_display), anders groeit een kolom toch mee met zijn
         # langste celwaarde en loop je weer tegen horizontaal scrollen aan.
         "Logo": st.column_config.ImageColumn(width=32),
-        "Blessure": st.column_config.ImageColumn(width=28, help="Speler heeft momenteel een blessure"),
+        "Blessure": st.column_config.ImageColumn(width=32, help="Speler heeft momenteel een blessure"),
         "Naam": st.column_config.TextColumn(width=108),
         "Lft.": st.column_config.NumberColumn(width=36),
         "Positie": st.column_config.TextColumn(width=62),
-        "Transfer": st.column_config.TextColumn(width=32, help="⚠️ = binnen de laatste 90 dagen getransfereerd"),
+        "Transfer": st.column_config.ImageColumn(width=32, help="Binnen de laatste 90 dagen getransfereerd"),
         "Club": st.column_config.TextColumn(width=92),
         "Competitie": st.column_config.TextColumn(width=120),
         "Land": st.column_config.TextColumn(width=50),

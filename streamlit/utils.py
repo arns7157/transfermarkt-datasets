@@ -474,6 +474,22 @@ def injury_icon_url() -> str:
     return _asset_data_uri("injury_icon.webp")
 
 
+def transfer_icon_url() -> str:
+    return _asset_data_uri("transfer_icon.png")
+
+
+def injury_icon_small_url() -> str:
+    """Voor de overzichtstabel: zelfde icoon, maar met ingebouwde
+    transparante marge zodat het kleiner oogt binnen de kolom - de
+    kolombreedte van st.column_config.ImageColumn heeft een ondergrens en
+    verkleint een volledig uitgevulde afbeelding zelf niet genoeg."""
+    return _asset_data_uri("injury_icon_small.webp")
+
+
+def transfer_icon_small_url() -> str:
+    return _asset_data_uri("transfer_icon_small.png")
+
+
 def inline_img(url, height: int = 18) -> str:
     """Small inline <img> tag for use inside st.markdown(unsafe_allow_html=True),
     e.g. next to a club/competition/country name. Returns '' for a missing URL
@@ -516,8 +532,9 @@ def transfer_badge_html(player_transfers: pd.DataFrame, within_days: int = 90) -
     to_crest = inline_img(latest.get("to_club_crest_url"), height=20)
     from_name = safe_val(latest.get("from_club_name"), "onbekend")
     to_name = safe_val(latest.get("to_club_name"), "onbekend")
+    icon = inline_img(transfer_icon_url(), height=16)
     return (
-        '<span class="transfer-badge">⚠️ Net getransfereerd'
+        f'<span class="transfer-badge">{icon}Net getransfereerd'
         '<span class="transfer-tooltip">'
         f"{from_crest}{from_name} &nbsp;→&nbsp; {to_crest}{to_name}<br>"
         f"{date:%d/%m/%Y}"
