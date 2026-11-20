@@ -506,6 +506,59 @@ def transfer_badge_html(player_transfers: pd.DataFrame, within_days: int = 90) -
     )
 
 
+def current_injury(player_injuries: pd.DataFrame, max_staleness_days: int = 120):
+    """Lopende blessure van deze speler, als die er is - anders None.
+    'Lopend' = until_date ontbreekt of ligt nog in de toekomst, ÉN from_date
+    is niet te lang geleden - anders is een ontbrekende until_date
+    waarschijnlijk gewoon onvolledige oude data, geen speler die al
+    maanden/jaren geblesseerd is. player_injuries moet al tot één speler
+    herleid zijn."""
+    if player_injuries.empty:
+        return None
+    today = pd.Timestamp.now().normalize()
+    dated = player_injuries.dropna(subset=["from_date"])
+    if dated.empty:
+        return None
+    ongoing = dated[dated["until_date"].isna() | (dated["until_date"] >= today)]
+    if ongoing.empty:
+        return None
+    latest = ongoing.sort_values("from_date", ascending=False).iloc[0]
+    if latest["from_date"] < today - pd.Timedelta(days=max_staleness_days):
+        return None
+    return latest
+
+
+def currently_injured_ids(injuries: pd.DataFrame, max_staleness_days: int = 120) -> set:
+    """player_id's met een lopende blessure, volgens hetzelfde criterium als
+    current_injury() - hier vectorized voor de volledige tabel i.p.v. per
+    speler, voor gebruik in een overzichtstabel."""
+    dated = injuries.dropna(subset=["from_date"])
+    if dated.empty:
+        return set()
+    today = pd.Timestamp.now().normalize()
+    ongoing = dated[dated["until_date"].isna() | (dated["until_date"] >= today)]
+    ongoing = ongoing[ongoing["from_date"] >= today - pd.Timedelta(days=max_staleness_days)]
+    return set(ongoing["player_id"])
+
+
+def injury_badge_html(player_injuries: pd.DataFrame) -> str:
+    """Badge met blessure-icoon - toont bij hover de blessure-naam en sinds
+    wanneer. Lege string als er geen lopende blessure is, zodat callers dit
+    onvoorwaardelijk in st.markdown kunnen plakken."""
+    injury = current_injury(player_injuries)
+    if injury is None:
+        return ""
+    name = safe_val(injury.get("injury"), "onbekende blessure")
+    until = injury.get("until_date")
+    until_str = f"verwacht terug op {until:%d/%m/%Y}" if pd.notna(until) else "nog geen terugkeerdatum"
+    return (
+        '<span class="injury-badge">❌ Geblesseerd'
+        '<span class="injury-tooltip">'
+        f"{name}<br>sinds {injury['from_date']:%d/%m/%Y} ({until_str})"
+        "</span></span>"
+    )
+
+
 def style_chart(fig, **extra_layout):
     """Apply a complete, self-consistent light style to a Plotly figure.
 
@@ -609,6 +662,42 @@ def inject_theme() -> None:
             z-index: 50;
         }
         .transfer-badge:hover .transfer-tooltip {display: block;}
+        /* injury_badge_html(): zelfde pure-CSS hover-tooltip-patroon als
+           .transfer-badge, maar rood om het duidelijk te onderscheiden van
+           een transfer-waarschuwing. */
+        .injury-badge {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #FCA5A5;
+            border-radius: 999px;
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: default;
+            margin-bottom: 12px;
+            margin-right: 8px;
+        }
+        .injury-badge .injury-tooltip {
+            display: none;
+            position: absolute;
+            top: 130%;
+            left: 0;
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 10px 14px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+            white-space: nowrap;
+            font-weight: 400;
+            font-size: 0.85rem;
+            color: #31333F;
+            z-index: 50;
+        }
+        .injury-badge:hover .injury-tooltip {display: block;}
         </style>
         """,
         unsafe_allow_html=True,

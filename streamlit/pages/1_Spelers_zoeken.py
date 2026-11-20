@@ -4,10 +4,12 @@ import streamlit as st
 from utils import (
     attach_competition_info,
     current_season_appearances,
+    currently_injured_ids,
     image_multiselect,
     inject_theme,
     load_appearances,
     load_competitions,
+    load_injuries,
     load_players,
     load_transfers,
     render_header,
@@ -22,6 +24,8 @@ players = load_players()
 competitions = load_competitions()
 appearances = load_appearances()
 transfers = load_transfers()
+injuries = load_injuries()
+injured_ids = currently_injured_ids(injuries)
 
 players = attach_competition_info(players, competitions)
 
@@ -148,6 +152,11 @@ st.caption(f"{len(filtered):,} spelers - klik op een rij om naar het spelerprofi
 
 filtered = filtered.copy()
 filtered["name_disp"] = filtered["name"].map(lambda v: truncate_text(v, 20))
+# Rood kruisje vóór de naam voor een speler met een lopende blessure - in de
+# naam-kolom zelf i.p.v. een eigen kolom, zodat het echt "voor zijn naam"
+# staat i.p.v. ergens anders in de rij.
+injured_mask = filtered["player_id"].isin(injured_ids)
+filtered.loc[injured_mask, "name_disp"] = "❌ " + filtered.loc[injured_mask, "name_disp"]
 filtered["club_disp"] = filtered["current_club_name"].map(lambda v: truncate_text(v, 16))
 filtered["nationality_disp"] = filtered["country_of_citizenship"].map(lambda v: truncate_text(v, 12))
 
@@ -176,7 +185,7 @@ render_player_table(
         # competition_display), anders groeit een kolom toch mee met zijn
         # langste celwaarde en loop je weer tegen horizontaal scrollen aan.
         "Logo": st.column_config.ImageColumn(width=32),
-        "Naam": st.column_config.TextColumn(width=108),
+        "Naam": st.column_config.TextColumn(width=108, help="❌ voor de naam = momenteel geblesseerd"),
         "Lft.": st.column_config.NumberColumn(width=36),
         "Positie": st.column_config.TextColumn(width=62),
         "Transfer": st.column_config.TextColumn(width=32, help="⚠️ = binnen de laatste 90 dagen getransfereerd"),

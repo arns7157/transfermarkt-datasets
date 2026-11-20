@@ -6,9 +6,11 @@ import streamlit as st
 from utils import (
     club_crest_by_name,
     competition_logo_url,
+    current_injury,
     current_season_appearances,
     format_money,
     inject_theme,
+    injury_badge_html,
     inline_img,
     load_appearances,
     load_injuries,
@@ -61,6 +63,7 @@ selected_id = st.selectbox(
 )
 player = players[players["player_id"] == selected_id].iloc[0]
 player_transfers = transfers[transfers["player_id"] == selected_id].sort_values("transfer_date", ascending=False)
+player_injuries = injuries[injuries["player_id"] == selected_id].sort_values("from_date", ascending=False)
 
 col_img, col_info = st.columns([1, 3])
 with col_img:
@@ -69,12 +72,15 @@ with col_img:
 with col_info:
     st.subheader(player["name"])
     st.markdown(position_badge(player.get("position")), unsafe_allow_html=True)
-    badge = transfer_badge_html(player_transfers)
-    if badge:
-        st.markdown(badge, unsafe_allow_html=True)
+    injury_badge = injury_badge_html(player_injuries)
+    if injury_badge:
+        st.markdown(injury_badge, unsafe_allow_html=True)
+    transfer_badge = transfer_badge_html(player_transfers)
+    if transfer_badge:
+        st.markdown(transfer_badge, unsafe_allow_html=True)
     st.write("")
     contract = player.get("contract_expiration_date")
-    contract_str = contract.strftime("%d/%m/%Y") if contract is not None and not isinstance(contract, float) else "–"
+    contract_str = contract.strftime("%d/%m/%Y") if pd.notna(contract) else "–"
     nat_flag = inline_img(player.get("citizenship_flag_url"))
     club_crest = inline_img(player.get("club_crest_url"))
     comp_logo = inline_img(player.get("competition_logo_url"))
@@ -233,13 +239,10 @@ else:
 
 st.divider()
 st.subheader("Blessurehistorie")
-player_injuries = injuries[injuries["player_id"] == selected_id].sort_values("from_date", ascending=False)
 if player_injuries.empty:
     st.info("Geen blessures geregistreerd voor deze speler.")
 else:
-    today = pd.Timestamp.now().normalize()
-    ongoing = player_injuries["until_date"].isna() | (player_injuries["until_date"] >= today)
-    if ongoing.any() and player_injuries.loc[ongoing, "from_date"].max() >= today - pd.Timedelta(days=120):
+    if current_injury(player_injuries) is not None:
         st.warning("Heeft recent een blessure zonder (bevestigde) terugkeerdatum - mogelijk nog altijd geblesseerd.")
     idisp = player_injuries[["season", "injury", "from_date", "until_date", "days", "games_missed"]].copy()
     idisp.columns = ["Seizoen", "Blessure", "Vanaf", "Tot", "Dagen", "Wedstrijden gemist"]
