@@ -3,6 +3,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from fotmob import (
+    PLAYER_STAT_LABELS,
+    PRIORITY_STATS,
+    fotmob_player_for_tm_player,
+    fotmob_player_stats,
+    list_fotmob_leagues,
+    order_stat_keys,
+    stat_label,
+)
 from utils import (
     club_crest_by_name,
     competition_logo_url,
@@ -203,6 +212,48 @@ else:
             "Logo": st.column_config.ImageColumn(width="small"),
         },
     )
+
+fotmob_leagues = list_fotmob_leagues()
+fotmob_match, fotmob_league_key = None, None
+for fm_key in fotmob_leagues:
+    fotmob_match = fotmob_player_for_tm_player(fm_key, player)
+    if fotmob_match:
+        fotmob_league_key = fm_key
+        break
+
+if fotmob_match:
+    fm_stats = fotmob_player_stats(fotmob_league_key, fotmob_match["id"])
+    if fm_stats:
+        st.divider()
+        st.subheader("FotMob - geavanceerde statistieken")
+        ordered_keys = order_stat_keys(list(fm_stats.keys()), PLAYER_STAT_LABELS)
+        # Meest bekeken statistieken als metric-tegels, de rest in een
+        # inklapbare tabel - 41 mogelijke statistieken is te veel om
+        # allemaal naast elkaar te tonen.
+        headline_keys = [k for k in ordered_keys if k in PRIORITY_STATS]
+        rest_keys = [k for k in ordered_keys if k not in PRIORITY_STATS]
+        # Kortere labels dan de volledige PLAYER_STAT_LABELS-tekst - anders
+        # knipt st.metric() de titel onleesbaar af in een smalle tegel.
+        headline_short_labels = {
+            "rating": "Rating",
+            "expected_goals": "xG",
+            "expected_assists": "xA",
+            "mins_played": "Minuten",
+        }
+        if headline_keys:
+            cols = st.columns(len(headline_keys))
+            for col, key in zip(cols, headline_keys):
+                label = headline_short_labels.get(key, stat_label(key, PLAYER_STAT_LABELS))
+                col.metric(label, fm_stats[key])
+        if rest_keys:
+            with st.expander(f"Alle FotMob-statistieken ({len(fm_stats)})"):
+                rest_df = pd.DataFrame(
+                    {
+                        "Statistiek": [stat_label(k, PLAYER_STAT_LABELS) for k in rest_keys],
+                        "Waarde": [fm_stats[k] for k in rest_keys],
+                    }
+                )
+                st.dataframe(rest_df, hide_index=True, width="stretch")
 
 st.divider()
 st.subheader("Transferhistorie")

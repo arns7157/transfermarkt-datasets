@@ -127,9 +127,10 @@ TEAM_STAT_LABELS = {
     "touches_in_opp_box_team": "Balcontacten in strafschopgebied tegenstander",
 }
 
-# Meest bekeken statistieken eerst in de selectbox, de rest alfabetisch op label.
-_PRIORITY_STATS = [
-    "goals", "goal_assist", "_goals_and_goal_assist", "rating",
+# Meest bekeken statistieken eerst in de selectbox / als metric-tegels op
+# het spelerprofiel, de rest alfabetisch op label.
+PRIORITY_STATS = [
+    "goals", "goal_assist", "rating",
     "expected_goals", "expected_assists", "mins_played",
 ]
 
@@ -145,7 +146,7 @@ def stat_label(stat_key: str, labels: dict) -> str:
 
 def order_stat_keys(stat_keys: list, labels: dict) -> list:
     def sort_key(k):
-        prio = _PRIORITY_STATS.index(k) if k in _PRIORITY_STATS else len(_PRIORITY_STATS)
+        prio = PRIORITY_STATS.index(k) if k in PRIORITY_STATS else len(PRIORITY_STATS)
         return (prio, stat_label(k, labels))
 
     return sorted(stat_keys, key=sort_key)
@@ -234,6 +235,93 @@ def resolve_player(league_key: str, team_id, fotmob_name: str):
         if len(candidates) == 1:
             return int(candidates.iloc[0]["player_id"])
     return None
+
+
+def fotmob_team_id_for_club(league_key: str, club_id) -> int | None:
+    """Transfermarkt club_id -> FotMob team_id (omgekeerde van de
+    team-mapping), of None als deze club niet gevolgd wordt in FotMob."""
+    try:
+        club_id = int(club_id)
+    except (TypeError, ValueError):
+        return None
+    for fm_id, tm_id in _TEAM_ID_MAPS.get(league_key, {}).items():
+        if tm_id == club_id:
+            return fm_id
+    return None
+
+
+@st.cache_data(ttl=3600)
+def _fotmob_roster(league_key: str) -> pd.DataFrame:
+    """Alle unieke (id, teamId, name)-combinaties over alle spelers-
+    statistiekbestanden heen - geen enkel bestand bevat gegarandeerd de
+    volledige kern (een speler zonder minuten staat zelfs niet in
+    mins_played), dus de unie van alle bestanden is de beste benadering
+    van 'wie zit er in deze competitie'."""
+    frames = []
+    for key in list_player_stats(league_key):
+        df = load_player_stat(league_key, key)
+        if not df.empty and {"id", "teamId", "name"}.issubset(df.columns):
+            frames.append(df[["id", "teamId", "name"]])
+    if not frames:
+        return pd.DataFrame(columns=["id", "teamId", "name"])
+    return pd.concat(frames, ignore_index=True).drop_duplicates(subset=["id"])
+
+
+def fotmob_player_for_tm_player(league_key: str, player_row) -> dict | None:
+    """Omgekeerde van resolve_player(): Transfermarkt-speler -> FotMob
+    {id, team_id, name}, of None. Zelfde voorzichtige matching-aanpak -
+    enkel koppelen bij een eenduidige naam-match binnen de gekoppelde club."""
+    team_id = fotmob_team_id_for_club(league_key, player_row.get("current_club_id"))
+    if team_id is None:
+        return None
+    roster = _fotmob_roster(league_key)
+    squad = roster[roster["teamId"] == team_id]
+    if squad.empty:
+        return None
+
+    def fm_last_word(name) -> str:
+        n = _normalize(name)
+        return n.split()[-1] if n else ""
+
+    tm_last = _normalize(player_row.get("last_name") or "")
+    tm_full = _normalize(player_row.get("name") or "")
+    tm_last_first_word = tm_last.split()[0] if tm_last else ""
+
+    if tm_last:
+        candidates = squad[squad["name"].map(lambda n: fm_last_word(n) == tm_last)]
+        if len(candidates) == 1:
+            r = candidates.iloc[0]
+            return {"id": int(r["id"]), "team_id": team_id, "name": r["name"]}
+    if tm_full:
+        candidates = squad[squad["name"].map(lambda n: _normalize(n) == tm_full)]
+        if len(candidates) == 1:
+            r = candidates.iloc[0]
+            return {"id": int(r["id"]), "team_id": team_id, "name": r["name"]}
+    if tm_last_first_word:
+        # Omgekeerd geval van resolve_player()'s samengestelde-achternaam-fix:
+        # TM "Dennis Eckert Ayensa" vs FotMob "Dennis Eckert".
+        candidates = squad[squad["name"].map(lambda n: fm_last_word(n) == tm_last_first_word)]
+        if len(candidates) == 1:
+            r = candidates.iloc[0]
+            return {"id": int(r["id"]), "team_id": team_id, "name": r["name"]}
+    return None
+
+
+def fotmob_player_stats(league_key: str, fotmob_player_id: int) -> dict:
+    """{label: waarde} voor elke spelersstatistiek waarin deze FotMob-speler
+    voorkomt - niet elke speler staat in elk bestand (bv. een speler zonder
+    enige kaart staat niet in yellow_card.json)."""
+    out = {}
+    for key in list_player_stats(league_key):
+        df = load_player_stat(league_key, key)
+        if df.empty:
+            continue
+        row = df[df["id"] == fotmob_player_id]
+        if row.empty:
+            continue
+        value = row.iloc[0]["value"]
+        out[key] = round(value, 2) if isinstance(value, float) else value
+    return out
 
 
 @st.cache_data(ttl=3600)
