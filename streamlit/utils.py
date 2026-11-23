@@ -766,6 +766,35 @@ def inject_theme() -> None:
             font-size: 0.78rem;
             margin: 2px 0 0 0;
         }
+        /* season_stat_bar_html() - 1-zijdige staaf in de FotMob-
+           seizoensstatistieken-tabel op het spelerprofiel. */
+        .fm-season-stat-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+        .fm-season-stat-label {
+            width: 190px;
+            flex-shrink: 0;
+            font-size: 0.85rem;
+            color: #31333F;
+        }
+        .fm-season-stat-val {
+            width: 42px;
+            flex-shrink: 0;
+            text-align: right;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .fm-season-stat-bar {
+            flex: 1;
+            height: 7px;
+            border-radius: 4px;
+            background: #E5E7EB;
+            overflow: hidden;
+        }
+        .fm-season-stat-fill {height: 100%;}
         </style>
         """,
         unsafe_allow_html=True,

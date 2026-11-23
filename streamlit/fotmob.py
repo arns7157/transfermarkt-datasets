@@ -427,11 +427,306 @@ def match_lineup(match_payload: dict) -> dict:
     return match_payload["payload"]["content"].get("lineup") or {}
 
 
+def half_pitch_shapes(line_color: str = "#CBD5E1") -> list:
+    """Plotly shapes voor een vereenvoudigde aanvalshelft (doel rechts, x:
+    50-100) - gedeeld tussen de wedstrijd-shotmap en de seizoens-schotenkaart
+    op het spelerprofiel."""
+    return [
+        dict(type="rect", x0=50, x1=100, y0=0, y1=100, line=dict(color=line_color)),
+        dict(type="rect", x0=83, x1=100, y0=21, y1=79, line=dict(color=line_color)),
+        dict(type="rect", x0=94.2, x1=100, y0=37, y1=63, line=dict(color=line_color)),
+        dict(type="line", x0=100, x1=100, y0=45, y1=55, line=dict(color=line_color, width=4)),
+    ]
+
+
 def _as_float(value):
     try:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+# Stats die een gemiddelde zijn i.p.v. een optelbaar aantal - optellen over
+# wedstrijden heen zou onzin opleveren. "Shot accuracy" zag er aanvankelijk
+# ook zo uit, maar bleek in de praktijk altijd exact gelijk aan "Shots on
+# target" (een dubbel veld) - die staat daarom in MATCH_STAT_SKIP, niet hier.
+RATE_STAT_NAMES = {"FotMob rating"}
+
+SHOT_SITUATION_LABELS_NL = {
+    "RegularPlay": "Gewoon spel",
+    "FastBreak": "Snelle uitbraak",
+    "SetPiece": "Standaardsituatie",
+    "FromCorner": "Via hoekschop",
+    "Penalty": "Penalty",
+    "FreeKick": "Vrije trap",
+    "ThrowInSetPiece": "Na inworp",
+    "IndividualPlay": "Individuele actie",
+}
+SHOT_TYPE_LABELS_NL = {
+    "RightFoot": "Rechtervoet",
+    "LeftFoot": "Linkervoet",
+    "Header": "Kopbal",
+    "OtherBodyParts": "Ander lichaamsdeel",
+}
+
+RADAR_STAT_NAMES = ["Goals", "Total shots", "Chances created", "Touches", "Aerial duels won", "Defensive actions"]
+RADAR_LABELS_NL = {
+    "Goals": "Doelpunten",
+    "Total shots": "Schotpogingen",
+    "Chances created": "Kansen gecreeerd",
+    "Touches": "Balcontacten",
+    "Aerial duels won": "Luchtduels gewonnen",
+    "Defensive actions": "Verdedigende acties",
+}
+
+# Nederlandse labels voor de per-wedstrijd playerStats-velden (match-niveau,
+# niet dezelfde set/namen als PLAYER_STAT_LABELS, dat is de aparte
+# leaderboard-databron van stats/players/*.json).
+MATCH_STAT_LABELS_NL = {
+    "Accurate crosses": "Nauwkeurige voorzetten",
+    "Accurate long balls": "Nauwkeurige lange passes",
+    "Accurate passes": "Nauwkeurige passes",
+    "Acted as sweeper": "Acties als sweeper-keeper",
+    "Aerial duels won": "Luchtduels gewonnen",
+    "Assists": "Assists",
+    "Big chances created": "Grote kansen gecreeerd",
+    "Big chances missed": "Grote kansen gemist",
+    "Blocked shots": "Geblokte schoten",
+    "Blocks": "Blocks",
+    "Chances created": "Kansen gecreeerd",
+    "Clearance off the line": "Clearance van de lijn",
+    "Clearances": "Clearances",
+    "Conceded penalty": "Toegestane penalty",
+    "Corners": "Hoekschoppen",
+    "Defensive actions": "Defensieve acties",
+    "Dispossessed": "Bal verloren onder druk",
+    "Diving save": "Reddende duik",
+    "Dribbled past": "Gepasseerd",
+    "Duels lost": "Duels verloren",
+    "Duels won": "Duels gewonnen",
+    "Error led to goal": "Fout leidde tot goal",
+    "Expected assists (xA)": "Verwachte assists (xA)",
+    "Expected goals (xG)": "Verwachte goals (xG)",
+    "Expected goals on target (xGOT)": "xG op doel (xGOT)",
+    "FotMob rating": "FotMob-rapportcijfer",
+    "Fouls committed": "Overtredingen",
+    "Goals": "Doelpunten",
+    "Goals conceded": "Tegendoelpunten",
+    "Goals prevented": "Doelpunten voorkomen",
+    "Ground duels won": "Grondduels gewonnen",
+    "Headed clearance": "Clearance met het hoofd",
+    "High claim": "Hoge bal gevangen",
+    "Hit woodwork": "Paal/lat geraakt",
+    "Interceptions": "Onderscheppingen",
+    "Last man tackle": "Tackle als laatste man",
+    "Line breaking passes": "Linie-doorbrekende passes",
+    "Minutes played": "Minuten gespeeld",
+    "Missed penalty": "Gemiste penalty",
+    "Offsides": "Buitenspel",
+    "Own goal": "Eigen doelpunt",
+    "Passes into final third": "Passes naar laatste derde",
+    "Penalties won": "Uitgelokte penalty's",
+    "Punches": "Weggeboksde ballen",
+    "Recoveries": "Balveroveringen",
+    "Saved penalties": "Gestopte penalty's",
+    "Saves": "Reddingen",
+    "Saves inside box": "Reddingen in de zestien",
+    "Shot accuracy": "Schotnauwkeurigheid",
+    "Shots off target": "Schoten naast",
+    "Shots on target": "Schoten op doel",
+    "Successful dribbles": "Geslaagde dribbels",
+    "Tackles": "Tackles",
+    "Throws": "Ingooien",
+    "Total shots": "Totaal schoten",
+    "Touches": "Balcontacten",
+    "Touches in opposition box": "Balcontacten in strafschopgebied",
+    "Was fouled": "Gefouleerd",
+    "xG Non-penalty": "xG zonder penalty's",
+    "xGOT faced": "xGOT tegen",
+}
+
+MATCH_STAT_GROUP_LABELS_NL = {"Top stats": "Topstatistieken", "Attack": "Aanval", "Defense": "Verdediging", "Duels": "Duels"}
+
+# Interne/fantasy-achtige velden zonder duidelijke waarde voor deze app -
+# niet tonen in de seizoensstatistieken-tabel.
+MATCH_STAT_SKIP = {"Shotmap", "Fantasy assists", "xG + xA", "Shot accuracy"}
+
+# Al als metric-tegel getoond op het spelerprofiel - niet dubbel in de
+# gedetailleerde, gegroepeerde tabel eronder.
+MATCH_STAT_HEADLINE = {"Goals", "Assists", "FotMob rating", "Expected goals (xG)", "Expected assists (xA)", "Minutes played"}
+
+
+def match_stat_label(name: str) -> str:
+    return MATCH_STAT_LABELS_NL.get(name, name)
+
+
+def _flatten_player_match_stats(info: dict) -> dict:
+    """{stat_naam: (groep, waarde)} voor 1 speler in 1 wedstrijd. Een stat
+    die in meerdere groepen voorkomt (bv. "Defensive actions" staat zowel
+    in "Top stats" als in "Defense") krijgt de laatst-verwerkte, specifiekere
+    groep - "Top stats" staat in de brondata altijd eerst, dus dict-overwrite
+    doet dit vanzelf correct."""
+    out = {}
+    for group in info.get("stats", []):
+        title = group.get("title", "")
+        for name, stat_info in group.get("stats", {}).items():
+            out[name] = (title, (stat_info.get("stat") or {}).get("value"))
+    return out
+
+
+@st.cache_data(ttl=3600)
+def _player_match_log(league_key: str) -> dict:
+    """fotmob_player_id -> lijst van {match_id, team_id, stats} - 1x alle
+    lokaal beschikbare wedstrijdbestanden inlezen en hergebruiken voor elk
+    spelerprofiel, i.p.v. ze telkens opnieuw te scannen."""
+    log: dict = {}
+    for match_id in available_match_ids(league_key):
+        match = load_match(league_key, match_id)
+        player_stats = match["payload"]["content"].get("playerStats") or {}
+        for pid_str, info in player_stats.items():
+            try:
+                pid = int(pid_str)
+            except (TypeError, ValueError):
+                continue
+            log.setdefault(pid, []).append(
+                {
+                    "match_id": match_id,
+                    "team_id": info.get("teamId"),
+                    "stats": _flatten_player_match_stats(info),
+                }
+            )
+    return log
+
+
+def player_match_log(league_key: str, fotmob_player_id: int) -> list:
+    return _player_match_log(league_key).get(fotmob_player_id, [])
+
+
+def player_season_totals(league_key: str, fotmob_player_id: int) -> dict:
+    """{stat_naam: {"group":, "value":}} - opgeteld over elke wedstrijd waar
+    deze speler speelstatistieken voor heeft, behalve de gemiddelde/
+    percentage-achtige stats (zie RATE_STAT_NAMES), die gemiddeld worden."""
+    entries = player_match_log(league_key, fotmob_player_id)
+    sums: dict = {}
+    counts: dict = {}
+    groups: dict = {}
+    for entry in entries:
+        for name, (group, value) in entry["stats"].items():
+            if value is None:
+                continue
+            groups[name] = group
+            sums[name] = sums.get(name, 0) + value
+            counts[name] = counts.get(name, 0) + 1
+    result = {}
+    for name, total in sums.items():
+        value = total / counts[name] if name in RATE_STAT_NAMES else total
+        result[name] = {"group": groups[name], "value": round(value, 2) if isinstance(value, float) else value}
+    return result
+
+
+@st.cache_data(ttl=3600)
+def _season_totals_all_players(league_key: str) -> pd.DataFrame:
+    """1 rij per FotMob-speler met zijn seizoenstotalen voor de
+    RADAR_STAT_NAMES - gebruikt om percentielen te berekenen t.o.v. de rest
+    van de competitie."""
+    log = _player_match_log(league_key)
+    rows = []
+    for pid, entries in log.items():
+        totals = player_season_totals(league_key, pid)
+        row = {"fotmob_id": pid, "team_id": entries[0]["team_id"], "matches": len(entries)}
+        for stat_name in RADAR_STAT_NAMES:
+            row[stat_name] = totals.get(stat_name, {}).get("value", 0) or 0
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def player_percentiles(league_key: str, fotmob_player_id: int, min_matches: int = 3) -> dict:
+    """Percentiel (0-100) van deze speler t.o.v. andere spelers in dezelfde
+    competitie met minstens min_matches wedstrijden, voor elke
+    RADAR_STAT_NAMES-statistiek. Geen aparte positiegroep (FotMob's eigen
+    positiecode is niet 1-op-1 te herleiden uit deze dump) - een speler met
+    weinig wedstrijden wordt uit de vergelijkingsgroep gehaald om te
+    vermijden dat 1 goede invalbeurt een vertekend hoog percentiel geeft."""
+    all_totals = _season_totals_all_players(league_key)
+    peers = all_totals[all_totals["matches"] >= min_matches]
+    if peers.empty or fotmob_player_id not in all_totals["fotmob_id"].values:
+        return {}
+    player_row = all_totals[all_totals["fotmob_id"] == fotmob_player_id].iloc[0]
+    percentiles = {}
+    for stat_name in RADAR_STAT_NAMES:
+        if stat_name not in peers.columns or len(peers) < 2:
+            continue
+        values = peers[stat_name]
+        rank = (values <= player_row[stat_name]).sum()
+        percentiles[stat_name] = round(rank / len(values) * 100)
+    return percentiles
+
+
+def player_season_shots(league_key: str, fotmob_player_id: int) -> pd.DataFrame:
+    """Alle schoten van deze speler over elke lokaal beschikbare wedstrijd
+    heen - voor een seizoens-schotenkaart i.p.v. per-wedstrijd."""
+    frames = []
+    for match_id in available_match_ids(league_key):
+        match = load_match(league_key, match_id)
+        shots = match_shots(match)
+        if shots.empty or "playerId" not in shots.columns:
+            continue
+        mine = shots[shots["playerId"] == fotmob_player_id].copy()
+        if not mine.empty:
+            mine["match_id"] = match_id
+            frames.append(mine)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+@st.cache_data(ttl=3600)
+def season_stat_max(league_key: str) -> dict:
+    """stat_naam -> hoogste seizoenstotaal over alle spelers - gebruikt om
+    de staafjes in de seizoensstatistieken-tabel relatief te schalen (zelfde
+    soort schaal als FotMob's eigen tabel, al is hun exacte schaalkeuze niet
+    gekend - dit is de duidelijkste, uitlegbare benadering)."""
+    maxes: dict = {}
+    for pid in _player_match_log(league_key):
+        for name, info in player_season_totals(league_key, pid).items():
+            value = info["value"]
+            if name not in RATE_STAT_NAMES and isinstance(value, (int, float)):
+                maxes[name] = max(maxes.get(name, 0), value)
+    return maxes
+
+
+@st.cache_data(ttl=3600)
+def season_stat_max_per90(league_key: str) -> dict:
+    """Zelfde als season_stat_max(), maar herleid naar per 90 minuten -
+    anders zou de Per 90-weergave de staafjes vergelijken met een
+    seizoenstotaal-schaal, wat ze allemaal bijna leeg zou laten lijken."""
+    maxes: dict = {}
+    for pid in _player_match_log(league_key):
+        totals = player_season_totals(league_key, pid)
+        mins = totals.get("Minutes played", {}).get("value", 0) or 0
+        nineties = mins / 90 if mins else 0
+        if not nineties:
+            continue
+        for name, info in totals.items():
+            value = info["value"]
+            if name in RATE_STAT_NAMES or name == "Minutes played" or not isinstance(value, (int, float)):
+                continue
+            maxes[name] = max(maxes.get(name, 0), value / nineties)
+    return maxes
+
+
+def season_stat_bar_html(label: str, value, max_value, color: str = "#22C55E") -> str:
+    """1-zijdige staaf (seizoensstatistieken-tabel) - breedte relatief t.o.v.
+    het hoogste seizoenstotaal in de competitie voor diezelfde statistiek."""
+    pct = min(100, (value / max_value * 100)) if max_value else 0
+    return (
+        '<div class="fm-season-stat-row">'
+        f'<div class="fm-season-stat-label">{label}</div>'
+        f'<div class="fm-season-stat-val">{value}</div>'
+        '<div class="fm-season-stat-bar">'
+        f'<div class="fm-season-stat-fill" style="width:{pct:.1f}%;background:{color};"></div>'
+        "</div></div>"
+    )
 
 
 def stat_bar_html(title: str, home_val, away_val, home_color: str, away_color: str) -> str:

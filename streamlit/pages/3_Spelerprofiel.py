@@ -4,13 +4,24 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from fotmob import (
-    PLAYER_STAT_LABELS,
-    PRIORITY_STATS,
+    MATCH_STAT_GROUP_LABELS_NL,
+    MATCH_STAT_HEADLINE,
+    MATCH_STAT_SKIP,
+    RADAR_LABELS_NL,
+    RADAR_STAT_NAMES,
+    RATE_STAT_NAMES,
+    SHOT_SITUATION_LABELS_NL,
+    SHOT_TYPE_LABELS_NL,
     fotmob_player_for_tm_player,
-    fotmob_player_stats,
+    half_pitch_shapes,
     list_fotmob_leagues,
-    order_stat_keys,
-    stat_label,
+    match_stat_label,
+    player_percentiles,
+    player_season_shots,
+    player_season_totals,
+    season_stat_bar_html,
+    season_stat_max,
+    season_stat_max_per90,
 )
 from utils import (
     club_crest_by_name,
@@ -222,38 +233,133 @@ for fm_key in fotmob_leagues:
         break
 
 if fotmob_match:
-    fm_stats = fotmob_player_stats(fotmob_league_key, fotmob_match["id"])
-    if fm_stats:
+    totals = player_season_totals(fotmob_league_key, fotmob_match["id"])
+    if totals:
         st.divider()
         st.subheader("FotMob - geavanceerde statistieken")
-        ordered_keys = order_stat_keys(list(fm_stats.keys()), PLAYER_STAT_LABELS)
-        # Meest bekeken statistieken als metric-tegels, de rest in een
-        # inklapbare tabel - 41 mogelijke statistieken is te veel om
-        # allemaal naast elkaar te tonen.
-        headline_keys = [k for k in ordered_keys if k in PRIORITY_STATS]
-        rest_keys = [k for k in ordered_keys if k not in PRIORITY_STATS]
-        # Kortere labels dan de volledige PLAYER_STAT_LABELS-tekst - anders
-        # knipt st.metric() de titel onleesbaar af in een smalle tegel.
+        st.caption(
+            "Opgebouwd uit elke lokaal beschikbare FotMob-wedstrijd van deze speler dit seizoen "
+            "- losstaand van de Transfermarkt-cijfers hierboven."
+        )
+
+        # Headline-tegels: rating gemiddeld, de rest opgeteld over de
+        # gespeelde wedstrijden (player_season_totals() regelt dat al).
         headline_short_labels = {
-            "rating": "Rating",
-            "expected_goals": "xG",
-            "expected_assists": "xA",
-            "mins_played": "Minuten",
+            "Goals": "Doelpunten",
+            "Assists": "Assists",
+            "FotMob rating": "Rating",
+            "Expected goals (xG)": "xG",
+            "Expected assists (xA)": "xA",
+            "Minutes played": "Minuten",
         }
-        if headline_keys:
-            cols = st.columns(len(headline_keys))
-            for col, key in zip(cols, headline_keys):
-                label = headline_short_labels.get(key, stat_label(key, PLAYER_STAT_LABELS))
-                col.metric(label, fm_stats[key])
-        if rest_keys:
-            with st.expander(f"Alle FotMob-statistieken ({len(fm_stats)})"):
-                rest_df = pd.DataFrame(
-                    {
-                        "Statistiek": [stat_label(k, PLAYER_STAT_LABELS) for k in rest_keys],
-                        "Waarde": [fm_stats[k] for k in rest_keys],
-                    }
+        present_headline = [k for k in headline_short_labels if k in totals]
+        if present_headline:
+            cols = st.columns(len(present_headline))
+            for col, key in zip(cols, present_headline):
+                col.metric(headline_short_labels[key], totals[key]["value"])
+
+        # Radar: percentiel t.o.v. andere spelers in de competitie.
+        percentiles = player_percentiles(fotmob_league_key, fotmob_match["id"])
+        if percentiles:
+            st.markdown("**Eigenschappen van speler** - percentiel t.o.v. andere spelers in de competitie")
+            cats = [RADAR_LABELS_NL[k] for k in RADAR_STAT_NAMES if k in percentiles]
+            vals = [percentiles[k] for k in RADAR_STAT_NAMES if k in percentiles]
+            if len(cats) >= 3:
+                fig = go.Figure()
+                fig.add_trace(
+                    go.Scatterpolar(
+                        r=vals + vals[:1],
+                        theta=cats + cats[:1],
+                        fill="toself",
+                        line_color="#3B82F6",
+                        fillcolor="rgba(59,130,246,0.25)",
+                    )
                 )
-                st.dataframe(rest_df, hide_index=True, width="stretch")
+                style_chart(
+                    fig,
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=9))),
+                    showlegend=False,
+                    height=360,
+                    margin=dict(t=20, b=20),
+                )
+                st.plotly_chart(fig, width="stretch")
+
+        # Seizoens-schotenkaart: alle schoten uit de lokaal beschikbare
+        # wedstrijden, met filters - geen klik-naar-detail navigatie zoals
+        # FotMob zelf (te veel interactieve staat voor de winst), wel een
+        # hover-tooltip per schot.
+        shots = player_season_shots(fotmob_league_key, fotmob_match["id"])
+        if not shots.empty:
+            st.markdown(f"**Schotenkaart seizoen** - {len(shots)} schoten, {round(shots['expectedGoals'].sum(), 2)} xG")
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                situations = sorted(shots["situation"].dropna().unique())
+                picked_situations = st.multiselect(
+                    "Situatie", situations, default=situations,
+                    format_func=lambda v: SHOT_SITUATION_LABELS_NL.get(v, v), key="fm_shot_situation",
+                )
+            with col_f2:
+                shot_types = sorted(shots["shotType"].dropna().unique())
+                picked_types = st.multiselect(
+                    "Schottype", shot_types, default=shot_types,
+                    format_func=lambda v: SHOT_TYPE_LABELS_NL.get(v, v), key="fm_shot_type",
+                )
+            filtered = shots[shots["situation"].isin(picked_situations) & shots["shotType"].isin(picked_types)]
+            if filtered.empty:
+                st.info("Geen schoten binnen deze filters.")
+            else:
+                fig = go.Figure()
+                for is_goal, color, symbol, name in (
+                    (True, "#EF4444", "star", "Doelpunt"),
+                    (False, "#3B82F6", "circle", "Geen doelpunt"),
+                ):
+                    subset = filtered[(filtered["eventType"] == "Goal") == is_goal]
+                    if subset.empty:
+                        continue
+                    sizes = subset["expectedGoals"].fillna(0).clip(lower=0) ** 0.5 * 32 + 8
+                    fig.add_trace(
+                        go.Scatter(
+                            x=subset["x"],
+                            y=subset["y"],
+                            mode="markers",
+                            name=name,
+                            marker=dict(size=sizes, color=color, symbol=symbol, line=dict(width=1, color="#1F2937"), opacity=0.85),
+                            customdata=subset[["eventType", "expectedGoals", "min"]],
+                            hovertemplate="Minuut %{customdata[2]}<br>%{customdata[0]} - xG %{customdata[1]:.2f}<extra></extra>",
+                        )
+                    )
+                fig.update_layout(shapes=half_pitch_shapes())
+                fig.update_xaxes(range=[48, 102], showgrid=False, zeroline=False, showticklabels=False)
+                fig.update_yaxes(range=[-5, 105], showgrid=False, zeroline=False, showticklabels=False)
+                style_chart(fig, legend=dict(orientation="h", y=1.08), height=380)
+                st.plotly_chart(fig, width="stretch")
+
+        # Seizoensstatistieken: gegroepeerd zoals FotMob's eigen
+        # wedstrijdpagina (Topstatistieken/Aanval/Verdediging/Duels), met
+        # Totaal/Per 90 toggle.
+        mode = st.radio("Weergave", ["Totaal", "Per 90"], horizontal=True, key="fm_season_mode")
+        mins_played = totals.get("Minutes played", {}).get("value", 0) or 0
+        nineties = mins_played / 90 if mins_played else 0
+        per_90 = mode == "Per 90" and nineties > 0
+        maxes = season_stat_max_per90(fotmob_league_key) if per_90 else season_stat_max(fotmob_league_key)
+        by_group: dict = {}
+        for name, info in totals.items():
+            if name in MATCH_STAT_SKIP or name in MATCH_STAT_HEADLINE:
+                continue
+            by_group.setdefault(info["group"], []).append((name, info["value"]))
+        group_order = ["Top stats", "Attack", "Defense", "Duels"]
+        for group in group_order:
+            rows = by_group.get(group)
+            if not rows:
+                continue
+            rows = sorted(rows, key=lambda r: -maxes.get(r[0], 0))
+            st.markdown(f"**{MATCH_STAT_GROUP_LABELS_NL.get(group, group)}**")
+            html_parts = []
+            for name, value in rows:
+                disp_value = round(value / nineties, 2) if per_90 and name not in RATE_STAT_NAMES else value
+                max_value = maxes.get(name, disp_value) or 1
+                html_parts.append(season_stat_bar_html(match_stat_label(name), disp_value, max_value))
+            st.markdown("".join(html_parts), unsafe_allow_html=True)
 
 st.divider()
 st.subheader("Transferhistorie")

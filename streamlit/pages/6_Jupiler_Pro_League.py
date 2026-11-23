@@ -6,6 +6,7 @@ from fotmob import (
     PLAYER_STAT_LABELS,
     TEAM_STAT_LABELS,
     available_match_ids,
+    half_pitch_shapes,
     list_fotmob_leagues,
     list_player_stats,
     list_team_stats,
@@ -217,12 +218,6 @@ with tab_matches:
             fig = go.Figure()
             # Vereenvoudigde aanvalshelft - FotMob normaliseert shots altijd
             # naar dezelfde aanvalsrichting (x -> 100 = doel), ongeacht team.
-            pitch_shapes = [
-                dict(type="rect", x0=50, x1=100, y0=0, y1=100, line=dict(color="#CBD5E1")),
-                dict(type="rect", x0=83, x1=100, y0=21, y1=79, line=dict(color="#CBD5E1")),
-                dict(type="rect", x0=94.2, x1=100, y0=37, y1=63, line=dict(color="#CBD5E1")),
-                dict(type="line", x0=100, x1=100, y0=45, y1=55, line=dict(color="#CBD5E1", width=4)),
-            ]
             for side, color, name in ((0, home_color, home_team["name"]), (1, away_color, away_team["name"])):
                 team_id = home_team["id"] if side == 0 else away_team["id"]
                 team_shots = shots[shots["teamId"] == team_id]
@@ -250,7 +245,7 @@ with tab_matches:
                         ),
                     )
                 )
-            fig.update_layout(shapes=pitch_shapes)
+            fig.update_layout(shapes=half_pitch_shapes())
             # Geen scaleanchor (geen gedwongen 1:1 schaal) - dat perste de
             # helft-breedte (y: 0-100) vs helft-lengte (x: 50-100) anders in
             # een veel te smalle, naar rechts weggedrukte strook. Gewoon
