@@ -20,10 +20,12 @@ from fotmob import (
     match_shots,
     match_top_stats,
     order_stat_keys,
+    plot_shots_on_pitch,
     resolve_club,
     resolve_player,
     stat_bar_html,
     stat_label,
+    style_pitch_axes,
 )
 from utils import inject_theme, inline_img, render_header, style_chart, truncate_text
 
@@ -216,44 +218,14 @@ with tab_matches:
             st.info("Geen shotmap beschikbaar voor deze wedstrijd.")
         else:
             fig = go.Figure()
-            # Vereenvoudigde aanvalshelft - FotMob normaliseert shots altijd
-            # naar dezelfde aanvalsrichting (x -> 100 = doel), ongeacht team.
             for side, color, name in ((0, home_color, home_team["name"]), (1, away_color, away_team["name"])):
                 team_id = home_team["id"] if side == 0 else away_team["id"]
-                team_shots = shots[shots["teamId"] == team_id]
-                if team_shots.empty:
-                    continue
-                is_goal = team_shots["eventType"] == "Goal"
-                sizes = (team_shots["expectedGoals"].fillna(0).clip(lower=0) ** 0.5 * 32 + 8)
-                fig.add_trace(
-                    go.Scatter(
-                        x=team_shots["x"],
-                        y=team_shots["y"],
-                        mode="markers",
-                        name=name,
-                        marker=dict(
-                            size=sizes,
-                            color=color,
-                            symbol=["star" if g else "circle" for g in is_goal],
-                            line=dict(width=1, color="#1F2937"),
-                            opacity=0.85,
-                        ),
-                        customdata=team_shots[["playerName", "eventType", "expectedGoals", "min"]],
-                        hovertemplate=(
-                            "%{customdata[0]}<br>Minuut %{customdata[3]}<br>"
-                            "%{customdata[1]} - xG %{customdata[2]:.2f}<extra></extra>"
-                        ),
-                    )
-                )
+                plot_shots_on_pitch(fig, shots[shots["teamId"] == team_id], color, name, show_player=True)
             fig.update_layout(shapes=half_pitch_shapes())
-            # Geen scaleanchor (geen gedwongen 1:1 schaal) - dat perste de
-            # helft-breedte (y: 0-100) vs helft-lengte (x: 50-100) anders in
-            # een veel te smalle, naar rechts weggedrukte strook. Gewoon
-            # laten uitrekken over de volledige grafiekbreedte oogt duidelijker.
-            fig.update_xaxes(range=[48, 102], showgrid=False, zeroline=False, showticklabels=False)
-            fig.update_yaxes(range=[-5, 105], showgrid=False, zeroline=False, showticklabels=False)
-            style_chart(fig, legend=dict(orientation="h", y=1.08), height=420)
-            st.plotly_chart(fig, width="stretch")
+            style_pitch_axes(fig)
+            style_chart(fig, legend=dict(orientation="h", y=1.08), height=480, width=420)
+            _, pitch_col, _ = st.columns([1, 2, 1])
+            pitch_col.plotly_chart(fig, width="content")
             st.caption("Grootte van de marker = xG van het schot. Ster = doelpunt.")
 
         st.divider()

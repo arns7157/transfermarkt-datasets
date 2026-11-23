@@ -16,6 +16,7 @@ import unicodedata
 from pathlib import Path
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from utils import load_clubs, load_players
@@ -428,15 +429,69 @@ def match_lineup(match_payload: dict) -> dict:
 
 
 def half_pitch_shapes(line_color: str = "#CBD5E1") -> list:
-    """Plotly shapes voor een vereenvoudigde aanvalshelft (doel rechts, x:
-    50-100) - gedeeld tussen de wedstrijd-shotmap en de seizoens-schotenkaart
-    op het spelerprofiel."""
+    """Plotly shapes voor een vereenvoudigde aanvalshelft, doel BOVENAAN -
+    de gebruikelijke oriëntatie voor een shotmap (Understat/FBref/FotMob
+    doen dit ook zo). Hoort bij plot_shots_on_pitch(), die de schot-
+    coördinaten (x = lengte, y = breedte) naar dezelfde schermassen omzet
+    (scherm-x = breedte, scherm-y = lengte) - dit NIET los gebruiken met de
+    rauwe x/y-kolommen, die staan nog in de oorspronkelijke (liggende)
+    oriëntatie."""
     return [
-        dict(type="rect", x0=50, x1=100, y0=0, y1=100, line=dict(color=line_color)),
-        dict(type="rect", x0=83, x1=100, y0=21, y1=79, line=dict(color=line_color)),
-        dict(type="rect", x0=94.2, x1=100, y0=37, y1=63, line=dict(color=line_color)),
-        dict(type="line", x0=100, x1=100, y0=45, y1=55, line=dict(color=line_color, width=4)),
+        dict(type="rect", x0=0, x1=100, y0=50, y1=100, line=dict(color=line_color)),
+        dict(type="rect", x0=21, x1=79, y0=83, y1=100, line=dict(color=line_color)),
+        dict(type="rect", x0=37, x1=63, y0=94.2, y1=100, line=dict(color=line_color)),
+        dict(type="line", x0=45, x1=55, y0=100, y1=100, line=dict(color=line_color, width=4)),
     ]
+
+
+def plot_shots_on_pitch(fig, shots: pd.DataFrame, color: str, name: str, show_player: bool = False) -> None:
+    """Voegt 1 Scatter-trace met schoten toe aan fig, in de verticale
+    (doel-bovenaan) oriëntatie van half_pitch_shapes() - wisselt x/y om
+    (scherm-x = pitch-breedte, scherm-y = pitch-lengte) t.o.v. de rauwe
+    FotMob-coördinaten (x = lengte, y = breedte). show_player=True zet de
+    spelersnaam vooraan in de hover-tekst (wedstrijd-shotmap, meerdere
+    spelers per kleur); False laat die weg (seizoenskaart van 1 speler,
+    overbodige herhaling)."""
+    if shots.empty:
+        return
+    is_goal = shots["eventType"] == "Goal"
+    sizes = shots["expectedGoals"].fillna(0).clip(lower=0) ** 0.5 * 32 + 8
+    hover_cols = (["playerName"] if show_player else []) + ["eventType", "expectedGoals", "min"]
+    prefix = "%{customdata[0]}<br>" if show_player else ""
+    i_type, i_xg, i_min = (1, 2, 3) if show_player else (0, 1, 2)
+    fig.add_trace(
+        go.Scatter(
+            x=shots["y"],
+            y=shots["x"],
+            mode="markers",
+            name=name,
+            marker=dict(
+                size=sizes,
+                color=color,
+                symbol=["star" if g else "circle" for g in is_goal],
+                line=dict(width=1, color="#1F2937"),
+                opacity=0.85,
+            ),
+            customdata=shots[hover_cols],
+            hovertemplate=(
+                f"{prefix}Minuut %{{customdata[{i_min}]}}<br>"
+                f"%{{customdata[{i_type}]}} - xG %{{customdata[{i_xg}]:.2f}}<extra></extra>"
+            ),
+        )
+    )
+
+
+def style_pitch_axes(fig) -> None:
+    """Dwingt een correcte, niet-uitgerekte verhouding af voor een shotmap
+    in de oriëntatie van half_pitch_shapes() - zonder dit groeit de
+    aanvalshelft mee met de volle breedte van de pagina terwijl de hoogte
+    vast blijft, met een helemaal uitgerekt en naar 1 kant weggedrukt veld
+    als gevolg."""
+    fig.update_xaxes(range=[-3, 103], showgrid=False, zeroline=False, showticklabels=False)
+    fig.update_yaxes(
+        range=[47, 103], showgrid=False, zeroline=False, showticklabels=False,
+        scaleanchor="x", scaleratio=1,
+    )
 
 
 def _as_float(value):

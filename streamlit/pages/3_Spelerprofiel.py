@@ -19,9 +19,11 @@ from fotmob import (
     player_percentiles,
     player_season_shots,
     player_season_totals,
+    plot_shots_on_pitch,
     season_stat_bar_html,
     season_stat_max,
     season_stat_max_per90,
+    style_pitch_axes,
 )
 from utils import (
     club_crest_by_name,
@@ -309,30 +311,13 @@ if fotmob_match:
                 st.info("Geen schoten binnen deze filters.")
             else:
                 fig = go.Figure()
-                for is_goal, color, symbol, name in (
-                    (True, "#EF4444", "star", "Doelpunt"),
-                    (False, "#3B82F6", "circle", "Geen doelpunt"),
-                ):
-                    subset = filtered[(filtered["eventType"] == "Goal") == is_goal]
-                    if subset.empty:
-                        continue
-                    sizes = subset["expectedGoals"].fillna(0).clip(lower=0) ** 0.5 * 32 + 8
-                    fig.add_trace(
-                        go.Scatter(
-                            x=subset["x"],
-                            y=subset["y"],
-                            mode="markers",
-                            name=name,
-                            marker=dict(size=sizes, color=color, symbol=symbol, line=dict(width=1, color="#1F2937"), opacity=0.85),
-                            customdata=subset[["eventType", "expectedGoals", "min"]],
-                            hovertemplate="Minuut %{customdata[2]}<br>%{customdata[0]} - xG %{customdata[1]:.2f}<extra></extra>",
-                        )
-                    )
+                plot_shots_on_pitch(fig, filtered[filtered["eventType"] == "Goal"], "#EF4444", "Doelpunt")
+                plot_shots_on_pitch(fig, filtered[filtered["eventType"] != "Goal"], "#3B82F6", "Geen doelpunt")
                 fig.update_layout(shapes=half_pitch_shapes())
-                fig.update_xaxes(range=[48, 102], showgrid=False, zeroline=False, showticklabels=False)
-                fig.update_yaxes(range=[-5, 105], showgrid=False, zeroline=False, showticklabels=False)
-                style_chart(fig, legend=dict(orientation="h", y=1.08), height=380)
-                st.plotly_chart(fig, width="stretch")
+                style_pitch_axes(fig)
+                style_chart(fig, legend=dict(orientation="h", y=1.08), height=480, width=420)
+                _, pitch_col, _ = st.columns([1, 2, 1])
+                pitch_col.plotly_chart(fig, width="content")
 
         # Seizoensstatistieken: gegroepeerd zoals FotMob's eigen
         # wedstrijdpagina (Topstatistieken/Aanval/Verdediging/Duels), met
