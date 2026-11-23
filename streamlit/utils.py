@@ -24,6 +24,7 @@ PAGE_ICONS = {
     "Spelerprofiel": "📊",
     "Vergelijken": "⚖️",
     "Signalen": "🚨",
+    "Jupiler Pro League": "⚽",
 }
 
 
@@ -735,6 +736,36 @@ def inject_theme() -> None:
             z-index: 50;
         }
         .injury-badge:hover .injury-tooltip {display: block;}
+        /* FotMob-wedstrijdstatistieken: 2-zijdige vergelijkingsbalk (thuis
+           vs uit), schaal + kleur bepaald per rij door de pagina zelf. */
+        .fm-stat-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .fm-stat-val {
+            width: 48px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+        .fm-stat-bar {
+            flex: 1;
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #E5E7EB;
+        }
+        .fm-stat-bar-home, .fm-stat-bar-away {height: 100%;}
+        .fm-stat-title {
+            text-align: center;
+            color: #6B7280;
+            font-size: 0.78rem;
+            margin: 2px 0 0 0;
+        }
         </style>
         """,
         unsafe_allow_html=True,

@@ -73,3 +73,8 @@ storage
 .agents/
 .claude/
 skills-lock.json
+
+# FotMob-datadump (data/Fotmob/) - los van de Transfermarkt-pijplijn, niet
+# door de app zelf opgehaald en bewust niet gecommit (58MB JSON, enkel
+# lokaal gebruikt voor de Jupiler Pro League-pagina).
+data/Fotmob/
