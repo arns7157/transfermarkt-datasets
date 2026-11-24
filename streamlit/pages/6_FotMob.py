@@ -6,7 +6,6 @@ from fotmob import (
     PLAYER_STAT_LABELS,
     TEAM_STAT_LABELS,
     available_match_ids,
-    half_pitch_shapes,
     list_fotmob_leagues,
     list_player_stats,
     list_team_stats,
@@ -20,33 +19,31 @@ from fotmob import (
     match_shots,
     match_top_stats,
     order_stat_keys,
-    plot_shots_on_pitch,
     resolve_club,
     resolve_player,
+    shot_map_figure,
     stat_bar_html,
     stat_label,
-    style_pitch_axes,
 )
 from utils import inject_theme, inline_img, render_header, style_chart, truncate_text
 
-st.set_page_config(page_title="Jupiler Pro League", page_icon="⚽", layout="wide")
+st.set_page_config(page_title="FotMob", page_icon="⚽", layout="wide")
 inject_theme()
 
 leagues = list_fotmob_leagues()
 if not leagues:
-    render_header("Jupiler Pro League", "Geavanceerde statistieken via FotMob.")
+    render_header("FotMob", "Geavanceerde statistieken via FotMob.")
     st.info("Geen FotMob-data gevonden in data/Fotmob/.")
     st.stop()
 
-# Vooralsnog altijd precies 1 competitie beschikbaar (BE1) - zodra er een
-# 2e submap bijkomt, wordt dit een st.selectbox net als de andere filters.
-league_key = next(iter(leagues))
-league_label = leagues[league_key]
-
 render_header(
-    league_label,
+    "FotMob",
     "Standenlijst, spelers-/teamstatistieken (xG, xA, ...) en wedstrijddetails via FotMob - "
     "aanvullend op de Transfermarkt-data, los van die pijplijn.",
+)
+
+league_key = st.selectbox(
+    "Competitie", list(leagues.keys()), format_func=lambda k: leagues[k], key="fm_league_picker",
 )
 
 tab_table, tab_players, tab_teams, tab_matches = st.tabs(
@@ -217,15 +214,13 @@ with tab_matches:
         if shots.empty:
             st.info("Geen shotmap beschikbaar voor deze wedstrijd.")
         else:
-            fig = go.Figure()
-            for side, color, name in ((0, home_color, home_team["name"]), (1, away_color, away_team["name"])):
-                team_id = home_team["id"] if side == 0 else away_team["id"]
-                plot_shots_on_pitch(fig, shots[shots["teamId"] == team_id], color, name, show_player=True)
-            fig.update_layout(shapes=half_pitch_shapes())
-            style_pitch_axes(fig)
-            style_chart(fig, legend=dict(orientation="h", y=1.08), height=480, width=420)
+            groups = [
+                (shots[shots["teamId"] == home_team["id"]], home_color, home_team["name"]),
+                (shots[shots["teamId"] == away_team["id"]], away_color, away_team["name"]),
+            ]
+            fig, _ = shot_map_figure(groups)
             _, pitch_col, _ = st.columns([1, 2, 1])
-            pitch_col.plotly_chart(fig, width="content")
+            pitch_col.pyplot(fig, width="content")
             st.caption("Grootte van de marker = xG van het schot. Ster = doelpunt.")
 
         st.divider()

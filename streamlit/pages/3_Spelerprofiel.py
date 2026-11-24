@@ -13,17 +13,16 @@ from fotmob import (
     SHOT_SITUATION_LABELS_NL,
     SHOT_TYPE_LABELS_NL,
     fotmob_player_for_tm_player,
-    half_pitch_shapes,
     list_fotmob_leagues,
     match_stat_label,
+    percentile_pizza_figure,
     player_percentiles,
     player_season_shots,
     player_season_totals,
-    plot_shots_on_pitch,
     season_stat_bar_html,
     season_stat_max,
     season_stat_max_per90,
-    style_pitch_axes,
+    shot_map_figure,
 )
 from utils import (
     club_crest_by_name,
@@ -267,24 +266,9 @@ if fotmob_match:
             cats = [RADAR_LABELS_NL[k] for k in RADAR_STAT_NAMES if k in percentiles]
             vals = [percentiles[k] for k in RADAR_STAT_NAMES if k in percentiles]
             if len(cats) >= 3:
-                fig = go.Figure()
-                fig.add_trace(
-                    go.Scatterpolar(
-                        r=vals + vals[:1],
-                        theta=cats + cats[:1],
-                        fill="toself",
-                        line_color="#3B82F6",
-                        fillcolor="rgba(59,130,246,0.25)",
-                    )
-                )
-                style_chart(
-                    fig,
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=9))),
-                    showlegend=False,
-                    height=360,
-                    margin=dict(t=20, b=20),
-                )
-                st.plotly_chart(fig, width="stretch")
+                fig = percentile_pizza_figure(cats, vals)
+                _, pizza_col, _ = st.columns([1, 2, 1])
+                pizza_col.pyplot(fig, width="content")
 
         # Seizoens-schotenkaart: alle schoten uit de lokaal beschikbare
         # wedstrijden, met filters - geen klik-naar-detail navigatie zoals
@@ -310,14 +294,13 @@ if fotmob_match:
             if filtered.empty:
                 st.info("Geen schoten binnen deze filters.")
             else:
-                fig = go.Figure()
-                plot_shots_on_pitch(fig, filtered[filtered["eventType"] == "Goal"], "#EF4444", "Doelpunt")
-                plot_shots_on_pitch(fig, filtered[filtered["eventType"] != "Goal"], "#3B82F6", "Geen doelpunt")
-                fig.update_layout(shapes=half_pitch_shapes())
-                style_pitch_axes(fig)
-                style_chart(fig, legend=dict(orientation="h", y=1.08), height=480, width=420)
+                fig, _ = shot_map_figure([
+                    (filtered[filtered["eventType"] == "Goal"], "#EF4444", "Doelpunt"),
+                    (filtered[filtered["eventType"] != "Goal"], "#3B82F6", "Geen doelpunt"),
+                ])
+                st.caption("Grootte van de marker = xG van het schot. Ster = doelpunt.")
                 _, pitch_col, _ = st.columns([1, 2, 1])
-                pitch_col.plotly_chart(fig, width="content")
+                pitch_col.pyplot(fig, width="content")
 
         # Seizoensstatistieken: gegroepeerd zoals FotMob's eigen
         # wedstrijdpagina (Topstatistieken/Aanval/Verdediging/Duels), met

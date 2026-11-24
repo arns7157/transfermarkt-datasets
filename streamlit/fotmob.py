@@ -1,14 +1,16 @@
-"""Loaders voor de FotMob-datadump in data/Fotmob/ (momenteel enkel BE1).
+"""Loaders voor de FotMob-datadump in data/Fotmob/ (~55 competitie-seizoenen,
+heel Europa plus een aantal competities elders).
 
 Elke submap van data/Fotmob/ is 1 competitie-seizoen, rechtstreeks
 overgenomen uit FotMob's eigen interne API-respons - niet door deze app
 zelf opgehaald, en geen onderdeel van de reguliere Transfermarkt-pijplijn.
 FotMob-IDs (team/speler) komen nergens overeen met Transfermarkt-IDs, dus
 alle koppeling naar de rest van de app (crests, klikbare spelerprofielen)
-gebeurt hier via een expliciete team-mapping (klein, vast ledental - dat
-is betrouwbaarder dan naam-matching met afkortingen/accenten zoals
-"St.Truiden" vs "Sint-Truidense VV") en, voor spelers, matching op
-genormaliseerde achternaam binnen de gekoppelde club.
+gebeurt via automatische naam-matching tussen FotMob-teams en Transfermarkt-
+clubs, geschaald naar de gekoppelde competitie/land (zie FOLDER_META en
+_team_id_map()) - en, voor spelers, matching op genormaliseerde achternaam
+binnen de gekoppelde club. Bij twijfel wordt nooit gegokt: geen koppeling is
+altijd beter dan een foute koppeling.
 """
 import json
 import re
@@ -16,40 +18,89 @@ import unicodedata
 from pathlib import Path
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
+from mplsoccer import PyPizza, VerticalPitch
 
-from utils import load_clubs, load_players
+from utils import load_clubs, load_competitions, load_players
 
 FOTMOB_DIR = Path(__file__).resolve().parent.parent / "data" / "Fotmob"
 
-LEAGUE_LABELS = {
-    "First_Division_A-2026-2027": "Jupiler Pro League",
+# folder_naam -> (TM-land of None, TM-competition_id of None, weergavenaam).
+# De competition_id wordt, waar bekend, gebruikt om de club-matching precies
+# te schalen (vermijdt valse matches met reserve-/jeugdploegen van dezelfde
+# club in een andere klasse, bv. "Real Madrid Castilla"); zonder bekende
+# competition_id (play-offs, derde klasses met meerdere reeksen, ...) valt
+# de matching terug op alle clubs van het land.
+FOLDER_META = {
+    "AUT_Bundesliga-2026-2027": ("Austria", "A1", "Oostenrijk - Bundesliga"),
+    "Bundesliga-2026-2027": ("Germany", "L1", "Duitsland - Bundesliga"),
+    "CHN_Super_League-2026": ("China", "CSL", "China - Super League"),
+    "CRO_HNL-2026-2027": ("Croatia", "KR1", "Kroatië - HNL"),
+    "CZE_1_Liga-2026-2027": ("Czech Republic", None, "Tsjechië - 1. Liga"),
+    "DEN_Superligaen-2026-2027": ("Denmark", "DK1", "Denemarken - Superligaen"),
+    "EGY_Premier_League-2026-2027": ("Egypt", "EGY1", "Egypte - Premier League"),
+    "ENG_Championship-2026-2027": ("England", "GB2", "Engeland - Championship"),
+    "ENG_League_One-2026-2027": ("England", "GB3", "Engeland - League One"),
+    "ENG_League_Two-2026-2027": ("England", "GB4", "Engeland - League Two"),
+    "ESP_LaLiga2-2026-2027": ("Spain", "ES2", "Spanje - LaLiga 2"),
+    "ESP_Primera_Federacion-2026-2027": ("Spain", None, "Spanje - Primera Federación"),
+    "ESP_Segunda_Federacion-2026-2027": ("Spain", None, "Spanje - Segunda Federación"),
+    "FRA_Ligue_1_Qualification-2025-2026": ("France", None, "Frankrijk - Ligue 1 play-offs"),
+    "FRA_Ligue_2-2026-2027": ("France", "FR2", "Frankrijk - Ligue 2"),
+    "FRA_Ligue_2_Qualification-2025-2026": ("France", None, "Frankrijk - Ligue 2 play-offs"),
+    "FRA_Ligue_3-2026-2027": ("France", "FR3", "Frankrijk - Ligue 3"),
+    "First_Division_A-2026-2027": ("Belgium", "BE1", "België - Jupiler Pro League"),
+    "First_Division_A_Qualification-2025-2026": ("Belgium", None, "België - Jupiler Pro League play-offs"),
+    "First_Division_B-2026-2027": ("Belgium", "BE2", "België - Challenger Pro League"),
+    "GER_2_Bundesliga-2026-2027": ("Germany", "L2", "Duitsland - 2. Bundesliga"),
+    "GER_2_Bundesliga_Qualification-2025-2026": ("Germany", None, "Duitsland - 2. Bundesliga play-offs"),
+    "GER_3_Liga-2026-2027": ("Germany", "L3", "Duitsland - 3. Liga"),
+    "GER_Bundesliga_Qualification-2025-2026": ("Germany", None, "Duitsland - Bundesliga play-offs"),
+    "GER_Regionalliga-2026-2027": ("Germany", None, "Duitsland - Regionalliga"),
+    "GER_Regionalliga_Qualification-2025-2026": ("Germany", None, "Duitsland - Regionalliga play-offs"),
+    "GRE_Super_League_1-2026-2027": ("Greece", "GR1", "Griekenland - Super League 1"),
+    "HUN_NB_I-2026-2027": ("Hungary", "UNG1", "Hongarije - NB I"),
+    "ISR_Ligat_haAl-2026-2027": ("Israel", "ISR1", "Israël - Ligat ha'Al"),
+    "ITA_Serie_B-2026-2027": ("Italy", "IT2", "Italië - Serie B"),
+    "ITA_Serie_C-2026-2027": ("Italy", None, "Italië - Serie C"),
+    "JPN_J_League-2026-2027": ("Japan", "JAP1", "Japan - J1 League"),
+    "KOR_K_League_1-2026": ("South Korea", "RSK1", "Zuid-Korea - K League 1"),
+    "KSA_Saudi_Pro_League-2026-2027": ("Saudi Arabia", "SA1", "Saudi-Arabië - Saudi Pro League"),
+    "LaLiga-2026-2027": ("Spain", "ES1", "Spanje - LaLiga"),
+    "Liga_Portugal-2026-2027": ("Portugal", "PO1", "Portugal - Liga Portugal"),
+    "Ligue_1-2026-2027": ("France", "FR1", "Frankrijk - Ligue 1"),
+    "MAR_Botola_Pro-2026-2027": ("Morocco", "MAR1", "Marokko - Botola Pro"),
+    "NED_Eerste_Divisie-2026-2027": ("Netherlands", "NL2", "Nederland - Eerste Divisie"),
+    "NED_Eredivisie-2026-2027": ("Netherlands", "NL1", "Nederland - Eredivisie"),
+    "NOR_Eliteserien-2026": ("Norway", "NO1", "Noorwegen - Eliteserien"),
+    "POL_Ekstraklasa-2026-2027": ("Poland", "PL1", "Polen - Ekstraklasa"),
+    "Premier_League-2026-2027": ("England", "GB1", "Engeland - Premier League"),
+    "QAT_Qatar_Stars_League-2026-2027": ("Qatar", "QSL", "Qatar - Stars League"),
+    "ROU_Liga_I-2026-2027": ("Romania", "RO1", "Roemenië - Liga I"),
+    "RUS_Premier_League-2026-2027": ("Russia", "RU1", "Rusland - Premier Liga"),
+    "SCO_Premiership-2026-2027": ("Scotland", "SC1", "Schotland - Premiership"),
+    "SRB_Super_Liga-2026-2027": ("Serbia", "SER1", "Servië - Super Liga"),
+    "SUI_Super_League-2026-2027": ("Switzerland", "C1", "Zwitserland - Super League"),
+    "SVK_1_liga-2026-2027": ("Slovakia", "SLO1", "Slowakije - 1. Liga"),
+    "SWE_Allsvenskan-2026": ("Sweden", "SE1", "Zweden - Allsvenskan"),
+    "Serie_A-2026-2027": ("Italy", "IT1", "Italië - Serie A"),
+    "TUR_Super_Lig-2026-2027": ("Turkey", "TR1", "Turkije - Süper Lig"),
+    "UAE_Pro_League-2026-2027": ("UAE", "UAE1", "VAE - Pro League"),
+    "UKR_Premier_League-2026-2027": ("Ukraine", "UKR1", "Oekraïne - Premier Liga"),
 }
 
-# FotMob team_id -> Transfermarkt club_id (handmatig opgezocht tegen
-# data/csv/clubs.csv.gz - 18 clubs, eenmalig en stabiel).
-_BE1_TEAM_ID_MAP = {
-    7978: 3948,     # Union St.Gilloise -> Union Saint-Gilloise
-    8342: 2282,     # Club Brugge -> Club Brugge KV
-    9986: 172,      # Sporting Charleroi -> Royal Charleroi SC
-    9991: 157,      # Gent -> KAA Gent
-    8635: 58,       # Anderlecht -> RSC Anderlecht
-    9987: 1184,     # Genk -> KRC Genk
-    9985: 3057,     # Standard Liege -> Standard Liege
-    6702: 5026,     # Lommel -> Lommel SK
-    10001: 968,     # Westerlo -> KVC Westerlo
-    8475: 28643,    # SK Beveren -> SK Beveren
-    9997: 475,      # St.Truiden -> Sint-Truidense VV
-    9988: 1096,     # Royal Antwerp -> Royal Antwerp FC
-    1773: 2727,     # OH Leuven -> Oud-Heverlee Leuven
-    9984: 520,      # Cercle Brugge -> Cercle Brugge
-    10000: 3508,    # Zulte Waregem -> Zulte Waregem
-    8203: 354,      # KV Mechelen -> KV Mechelen
-    1218969: 3901,  # RAAL La Louviere -> RAAL La Louviere
-    8571: 601,      # Kortrijk -> KV Kortrijk
+# Handmatige overrides bovenop de automatische naam-matching, voor clubs
+# waar die faalt door een afkorting/spelling die FotMob en Transfermarkt niet
+# delen (bv. "Union St.Gilloise" vs "Union Saint-Gilloise") - eenmalig tegen
+# data/csv/clubs.csv.gz opgezocht. Wint altijd van een automatische match.
+_MANUAL_TEAM_ID_OVERRIDES = {
+    "First_Division_A-2026-2027": {
+        7978: 3948,   # Union St.Gilloise -> Union Saint-Gilloise
+        9986: 172,    # Sporting Charleroi -> Royal Charleroi SC
+        9997: 475,    # St.Truiden -> Sint-Truidense VV
+        1773: 2727,   # OH Leuven -> Oud-Heverlee Leuven
+    },
 }
-_TEAM_ID_MAPS = {"First_Division_A-2026-2027": _BE1_TEAM_ID_MAP}
 
 PLAYER_STAT_LABELS = {
     "_expected_goals_and_expected_assists_per_90": "xG+xA per 90",
@@ -153,15 +204,18 @@ def order_stat_keys(stat_keys: list, labels: dict) -> list:
     return sorted(stat_keys, key=sort_key)
 
 
+def _league_label(folder: str) -> str:
+    return FOLDER_META.get(folder, (None, None, folder.replace("_", " ")))[2]
+
+
 def list_fotmob_leagues() -> dict:
-    """{map_naam: weergavenaam} voor elke submap van data/Fotmob/."""
+    """{map_naam: weergavenaam} voor elke submap van data/Fotmob/, gesorteerd
+    op weergavenaam (land - competitie) zodat de dropdown per land
+    gegroepeerd aanvoelt."""
     if not FOTMOB_DIR.exists():
         return {}
-    return {
-        d.name: LEAGUE_LABELS.get(d.name, d.name.replace("_", " "))
-        for d in sorted(FOTMOB_DIR.iterdir())
-        if d.is_dir()
-    }
+    keys = [d.name for d in FOTMOB_DIR.iterdir() if d.is_dir()]
+    return {k: _league_label(k) for k in sorted(keys, key=_league_label)}
 
 
 def _dir(league_key: str) -> Path:
@@ -183,20 +237,87 @@ def _club_lookup() -> pd.DataFrame:
     return load_clubs().set_index("club_id")
 
 
+@st.cache_data(ttl=3600)
+def _fotmob_team_names(league_key: str) -> dict:
+    """FotMob team_id -> teamnaam, uit fixtures.json (elk team komt daar
+    minstens 1x voor als thuis- of uitploeg) - gebruikt als weergavenaam
+    wanneer er geen Transfermarkt-koppeling gevonden is, en als bron voor de
+    automatische naam-matching in _team_id_map()."""
+    names = {}
+    fixtures = load_fixtures(league_key)
+    for _, row in fixtures.iterrows():
+        names.setdefault(int(row["home_id"]), row["home"])
+        names.setdefault(int(row["away_id"]), row["away"])
+    return names
+
+
+def _club_name_tokens(name) -> set:
+    return set(_normalize(name).split())
+
+
+@st.cache_data(ttl=3600)
+def _scoped_clubs(league_key: str) -> pd.DataFrame:
+    """Transfermarkt-clubs om deze FotMob-competitie tegen te matchen - bij
+    voorkeur exact de gekoppelde competition_id (zie FOLDER_META), anders
+    alle clubs van het land als fallback."""
+    country, competition_id, _ = FOLDER_META.get(league_key, (None, None, ""))
+    clubs = load_clubs()
+    if competition_id:
+        scoped = clubs[clubs["domestic_competition_id"] == competition_id]
+        if not scoped.empty:
+            return scoped
+    if not country:
+        return clubs.iloc[0:0]
+    comp_ids = load_competitions().pipe(lambda c: c[c["country"] == country])["competition_id"]
+    return clubs[clubs["domestic_competition_id"].isin(comp_ids)]
+
+
+@st.cache_data(ttl=3600)
+def _team_id_map(league_key: str) -> dict:
+    """FotMob team_id -> Transfermarkt club_id, automatisch gekoppeld op
+    naam binnen _scoped_clubs(): elk woord van de FotMob-naam moet als
+    volledig woord in de TM-naam voorkomen, en bij meerdere kandidaten wint
+    enkel een eenduidige "kleinste overschot aan extra woorden" (bv. FotMob
+    "Real Madrid" -> TM "Real Madrid" i.p.v. "Real Madrid Castilla"). Blijft
+    het dan nog gelijk op (bv. "Milan" tov zowel "AC Milan" als "Inter
+    Milan") dan geen koppeling - zie moduledocstring."""
+    scoped = _scoped_clubs(league_key)
+    if scoped.empty:
+        return {}
+    club_tokens = [(row["club_id"], _club_name_tokens(row["name"])) for _, row in scoped.iterrows()]
+    mapping = {}
+    for team_id, name in _fotmob_team_names(league_key).items():
+        ft = _club_name_tokens(name)
+        if not ft:
+            continue
+        candidates = [(cid, len(ttoks - ft)) for cid, ttoks in club_tokens if ft.issubset(ttoks)]
+        if not candidates:
+            continue
+        min_extra = min(extra for _, extra in candidates)
+        best = [cid for cid, extra in candidates if extra == min_extra]
+        if len(best) == 1:
+            mapping[team_id] = best[0]
+    mapping.update(_MANUAL_TEAM_ID_OVERRIDES.get(league_key, {}))
+    return mapping
+
+
 def resolve_club(league_key: str, team_id) -> dict:
-    """FotMob team_id -> {club_id, name, crest_url}, of {} als onbekend."""
+    """FotMob team_id -> {club_id, name, crest_url}. Zonder Transfermarkt-
+    koppeling valt "name" terug op de FotMob-naam zelf (zonder club_id/
+    crest_url); {} enkel als zelfs de FotMob-naam onbekend is."""
     if team_id is None:
         return {}
     try:
         team_id = int(team_id)
     except (TypeError, ValueError):
         return {}
-    club_id = _TEAM_ID_MAPS.get(league_key, {}).get(team_id)
+    fotmob_name = _fotmob_team_names(league_key).get(team_id, "")
+    club_id = _team_id_map(league_key).get(team_id)
     if club_id is None:
-        return {}
+        return {"name": fotmob_name} if fotmob_name else {}
     clubs = _club_lookup()
     if club_id not in clubs.index:
-        return {}
+        return {"name": fotmob_name} if fotmob_name else {}
     row = clubs.loc[club_id]
     return {"club_id": club_id, "name": row["name"], "crest_url": row.get("crest_url", "") or ""}
 
@@ -214,7 +335,7 @@ def resolve_player(league_key: str, team_id, fotmob_name: str):
     club. Bij twijfel (geen club-match, geen/dubbele naam-match) geen gok
     wagen - een foute profiel-link is erger dan geen link."""
     club = resolve_club(league_key, team_id)
-    if not club or not fotmob_name:
+    if "club_id" not in club or not fotmob_name:
         return None
     squad = _players_by_club().get(club["club_id"])
     if squad is None or squad.empty:
@@ -245,7 +366,7 @@ def fotmob_team_id_for_club(league_key: str, club_id) -> int | None:
         club_id = int(club_id)
     except (TypeError, ValueError):
         return None
-    for fm_id, tm_id in _TEAM_ID_MAPS.get(league_key, {}).items():
+    for fm_id, tm_id in _team_id_map(league_key).items():
         if tm_id == club_id:
             return fm_id
     return None
@@ -428,70 +549,84 @@ def match_lineup(match_payload: dict) -> dict:
     return match_payload["payload"]["content"].get("lineup") or {}
 
 
-def half_pitch_shapes(line_color: str = "#CBD5E1") -> list:
-    """Plotly shapes voor een vereenvoudigde aanvalshelft, doel BOVENAAN -
-    de gebruikelijke oriëntatie voor een shotmap (Understat/FBref/FotMob
-    doen dit ook zo). Hoort bij plot_shots_on_pitch(), die de schot-
-    coördinaten (x = lengte, y = breedte) naar dezelfde schermassen omzet
-    (scherm-x = breedte, scherm-y = lengte) - dit NIET los gebruiken met de
-    rauwe x/y-kolommen, die staan nog in de oorspronkelijke (liggende)
-    oriëntatie."""
-    return [
-        dict(type="rect", x0=0, x1=100, y0=50, y1=100, line=dict(color=line_color)),
-        dict(type="rect", x0=21, x1=79, y0=83, y1=100, line=dict(color=line_color)),
-        dict(type="rect", x0=37, x1=63, y0=94.2, y1=100, line=dict(color=line_color)),
-        dict(type="line", x0=45, x1=55, y0=100, y1=100, line=dict(color=line_color, width=4)),
-    ]
-
-
-def plot_shots_on_pitch(fig, shots: pd.DataFrame, color: str, name: str, show_player: bool = False) -> None:
-    """Voegt 1 Scatter-trace met schoten toe aan fig, in de verticale
-    (doel-bovenaan) oriëntatie van half_pitch_shapes() - wisselt x/y om
-    (scherm-x = pitch-breedte, scherm-y = pitch-lengte) t.o.v. de rauwe
-    FotMob-coördinaten (x = lengte, y = breedte). show_player=True zet de
-    spelersnaam vooraan in de hover-tekst (wedstrijd-shotmap, meerdere
-    spelers per kleur); False laat die weg (seizoenskaart van 1 speler,
-    overbodige herhaling)."""
-    if shots.empty:
-        return
-    is_goal = shots["eventType"] == "Goal"
-    sizes = shots["expectedGoals"].fillna(0).clip(lower=0) ** 0.5 * 32 + 8
-    hover_cols = (["playerName"] if show_player else []) + ["eventType", "expectedGoals", "min"]
-    prefix = "%{customdata[0]}<br>" if show_player else ""
-    i_type, i_xg, i_min = (1, 2, 3) if show_player else (0, 1, 2)
-    fig.add_trace(
-        go.Scatter(
-            x=shots["y"],
-            y=shots["x"],
-            mode="markers",
-            name=name,
-            marker=dict(
-                size=sizes,
-                color=color,
-                symbol=["star" if g else "circle" for g in is_goal],
-                line=dict(width=1, color="#1F2937"),
-                opacity=0.85,
-            ),
-            customdata=shots[hover_cols],
-            hovertemplate=(
-                f"{prefix}Minuut %{{customdata[{i_min}]}}<br>"
-                f"%{{customdata[{i_type}]}} - xG %{{customdata[{i_xg}]:.2f}}<extra></extra>"
-            ),
+def shot_map_figure(shot_groups: list[tuple[pd.DataFrame, str, str]], figsize: tuple = (6, 7.2)):
+    """Tekent een aanvalshelft-shotmap met mplsoccer (doel bovenaan,
+    opta-coördinaten 0-100 - exact de rauwe FotMob x/y, dus geen
+    conversie nodig zoals bij de vroegere Plotly-versie). shot_groups is
+    een lijst van (shots_df, kleur, label); elke df heeft kolommen x, y,
+    eventType, expectedGoals. Doelpunten krijgen een ster-marker, de
+    grootte van elke marker schaalt met xG. Geeft (fig, ax) terug zodat de
+    caller erboven nog kan annoteren."""
+    pitch = VerticalPitch(
+        pitch_type="opta", half=True, pitch_color="#FFFFFF", line_color="#CBD5E1",
+        linewidth=1.2, pad_bottom=1,
+    )
+    fig, ax = pitch.draw(figsize=figsize)
+    fig.patch.set_facecolor("#FFFFFF")
+    any_label = False
+    for shots, color, label in shot_groups:
+        if shots.empty:
+            continue
+        is_goal = shots["eventType"] == "Goal"
+        sizes = shots["expectedGoals"].fillna(0).clip(lower=0) ** 0.5 * 260 + 50
+        # Het label hangt aan de eerste marker-soort die deze groep echt
+        # heeft (meestal de cirkels) - anders valt de legende-entry weg
+        # zodra een groep toevallig uitsluitend doelpunten bevat.
+        label_placed = False
+        if (~is_goal).any():
+            pitch.scatter(
+                shots.loc[~is_goal, "x"], shots.loc[~is_goal, "y"], s=sizes[~is_goal],
+                ax=ax, color=color, edgecolors="#31333F", linewidth=0.6, alpha=0.8,
+                label=label if label else None,
+            )
+            label_placed = bool(label)
+        if is_goal.any():
+            pitch.scatter(
+                shots.loc[is_goal, "x"], shots.loc[is_goal, "y"], s=sizes[is_goal],
+                ax=ax, color=color, edgecolors="#31333F", linewidth=0.8, alpha=0.95,
+                marker="*", label=(label if (label and not label_placed) else None),
+            )
+        any_label = any_label or bool(label)
+    if any_label:
+        ax.legend(
+            loc="upper center", bbox_to_anchor=(0.5, 1.08), ncol=2, fontsize=9,
+            frameon=False, labelcolor="#31333F",
         )
-    )
+    return fig, ax
 
 
-def style_pitch_axes(fig) -> None:
-    """Dwingt een correcte, niet-uitgerekte verhouding af voor een shotmap
-    in de oriëntatie van half_pitch_shapes() - zonder dit groeit de
-    aanvalshelft mee met de volle breedte van de pagina terwijl de hoogte
-    vast blijft, met een helemaal uitgerekt en naar 1 kant weggedrukt veld
-    als gevolg."""
-    fig.update_xaxes(range=[-3, 103], showgrid=False, zeroline=False, showticklabels=False)
-    fig.update_yaxes(
-        range=[47, 103], showgrid=False, zeroline=False, showticklabels=False,
-        scaleanchor="x", scaleratio=1,
+def percentile_pizza_figure(categories: list[str], values: list[int], color: str = "#22C55E"):
+    """Tekent een percentiel-'pizza'-chart (mplsoccer PyPizza) - 1 taartpunt
+    per categorie uit categories, met values (0-100) als percentiel t.o.v.
+    de rest van de competitie. Vervangt de vroegere Plotly-radar: leesbaarder
+    bij weinig categorieën en de gangbare stijl in football analytics."""
+    baker = PyPizza(
+        params=categories,
+        background_color="#FFFFFF",
+        straight_line_color="#CBD5E1",
+        straight_line_lw=1,
+        last_circle_lw=1.5,
+        last_circle_color="#CBD5E1",
+        other_circle_lw=0,
+        inner_circle_size=10,
     )
+    fig, _ = baker.make_pizza(
+        values,
+        figsize=(6.5, 7),
+        color_blank_space="same",
+        blank_alpha=0.3,
+        slice_colors=[color] * len(values),
+        value_colors=["#FFFFFF"] * len(values),
+        value_bck_colors=[color] * len(values),
+        kwargs_slices=dict(edgecolor="#FFFFFF", zorder=2, linewidth=1.5),
+        kwargs_params=dict(color="#31333F", fontsize=10),
+        kwargs_values=dict(
+            color="#FFFFFF", fontsize=10, zorder=3,
+            bbox=dict(edgecolor="#FFFFFF", facecolor=color, boxstyle="round,pad=0.25", lw=1),
+        ),
+    )
+    fig.patch.set_facecolor("#FFFFFF")
+    return fig
 
 
 def _as_float(value):

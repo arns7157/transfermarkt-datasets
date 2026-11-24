@@ -24,7 +24,7 @@ PAGE_ICONS = {
     "Spelerprofiel": "📊",
     "Vergelijken": "⚖️",
     "Signalen": "🚨",
-    "Jupiler Pro League": "⚽",
+    "FotMob": "⚽",
 }
 
 

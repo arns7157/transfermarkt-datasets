@@ -75,6 +75,21 @@ storage
 skills-lock.json
 
 # FotMob-datadump (data/Fotmob/) - los van de Transfermarkt-pijplijn, niet
-# door de app zelf opgehaald en bewust niet gecommit (58MB JSON, enkel
-# lokaal gebruikt voor de Jupiler Pro League-pagina).
+# door de app zelf opgehaald en bewust niet gecommit (2,6GB JSON, enkel
+# lokaal gebruikt voor de FotMob-pagina).
 data/Fotmob/
+
+# Lokaal geflattend FotMob-DuckDB-bestand (scripts/fotmob_to_duckdb.py) -
+# gegenereerd artefact, net als dbt/duck.db.
+data/fotmob.duckdb
+data/fotmob.duckdb.wal
+
+# FastAPI-backend (backend/) - lokale run-logs, geen onderdeel van de repo
+backend_out.log
+backend_err.log
+streamlit_out.log
+streamlit_err.log
+
+# Lock-bestand van een lokale tool-run (webdriver/download-manager), geen
+# projectinhoud.
+downloaded_files/
