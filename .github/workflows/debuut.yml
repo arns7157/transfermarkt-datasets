@@ -200,11 +200,19 @@ jobs:
                       a = cells[2].find("a")
                       if a:
                           club = (a.get("title") or clean(a)).strip()
-                  if current in HIGHEST_TITLES and not result["debut_highest_division_date"]:
+                  # Op kernwoorden i.p.v. exacte titel: "Hoogste divisie (Noorwegen)" e.d.
+                  # werd anders volledig overgeslagen.
+                  is_highest = current in HIGHEST_TITLES or any(
+                      w in current for w in ("hoogste", "highest", "höchste", "plus haute", "massima", "primera div")
+                  )
+                  is_second = current in SECOND_TITLES or any(
+                      w in current for w in ("tweede", "2de", "2e niveau", "second", "2nd", "2. ", "deuxième", "seconda", "segunda")
+                  )
+                  if is_highest and not result["debut_highest_division_date"]:
                       result["debut_highest_division_date"]        = date_val
                       result["debut_highest_division_club"]        = club
                       result["debut_highest_division_competition"] = competition
-                  elif current in SECOND_TITLES and not result["debut_second_tier_date"]:
+                  elif is_second and not result["debut_second_tier_date"]:
                       result["debut_second_tier_date"]             = date_val
                       result["debut_second_tier_club"]             = club
                       result["debut_second_tier_competition"]      = competition
